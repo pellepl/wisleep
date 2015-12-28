@@ -3,6 +3,14 @@
 #include "uart_driver.h"
 #include "timer.h"
 
+#ifdef CONFIG_SPI
+#include "spi_driver.h"
+#endif
+#ifdef CONFIG_I2C
+#include "i2c_driver.h"
+#endif
+
+
 /**
   * @brief  This function handles NMI exception.
   * @param  None

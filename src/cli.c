@@ -36,12 +36,6 @@ static u8_t in[256];
 static int _argc;
 static void *_args[16];
 
-static int f_led(char* led, int ena);
-static int f_test_light(void);
-static int f_test_trans(char *arg);
-static int f_trig_arm(void);
-static int f_trig_alarm(void);
-
 static int f_uwrite(int uart, char* data);
 static int f_uread(int uart, int numchars);
 static int f_uconf(int uart, int speed);
@@ -64,24 +58,6 @@ static void cli_print_app_name(void);
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 static cmd c_tbl[] = {
-    { .name = "led", .fn = (func) f_led,
-        .help = "Enable/disable status leds\nled <arm|alarm|dbg> <0|1>\n"
-    },
-
-    { .name = "test_light", .fn = (func) f_test_light,
-        .help = "Turn on light for 1 sec\n"
-    },
-    { .name = "test_trans", .fn = (func) f_test_trans,
-        .help = "Turn on transducer for 1 sec\n"
-    },
-
-    { .name = "trig_arm", .fn = (func) f_trig_arm,
-        .help = "Push arm button\n"
-    },
-    { .name = "trig_alarm", .fn = (func) f_trig_alarm,
-        .help = "Push alarm button\n"
-    },
-
     { .name = "dump", .fn = (func) f_dump,
         .help = "Dumps state of all system\n"
     },
@@ -145,71 +121,6 @@ static cmd c_tbl[] = {
   };
 
 /////////////////////////////////////////////////////////////////////////////////////////////
-
-static int f_led(char* led, int ena) {
-  if (strcmp(led, "arm") == 0) {
-    if (ena) {
-      gpio_enable(PIN_STAT_ARM);
-    } else {
-      gpio_disable(PIN_STAT_ARM);
-    }
-  } else if (strcmp(led, "alarm") == 0) {
-    if (ena) {
-      gpio_enable(PIN_STAT_ALARM);
-    } else {
-      gpio_disable(PIN_STAT_ALARM);
-    }
-  } else if (strcmp(led, "dbg") == 0) {
-    if (ena) {
-      gpio_disable(PIN_LED);
-    } else {
-      gpio_enable(PIN_LED);
-    }
-  } else {
-    print("error: unknown led <arm|alarm|dbg>\n");
-  }
-  return 0;
-}
-
-static void light_test_tf(u32_t arg, void *argp) {
-  APP_set_light(FALSE);
-}
-
-static int f_test_light(void) {
-  static task_timer light_test_timer;
-  task *t = TASK_create(light_test_tf, 0);
-  ASSERT(t);
-  TASK_start_timer(t, &light_test_timer, 0, 0, 1000, 0, "lighttesttim");
-  APP_set_light(TRUE);
-  return 0;
-}
-
-static int f_trig_arm(void) {
-  APP_trigger_arm();
-  return 0;
-}
-
-static int f_trig_alarm(void) {
-  APP_trigger_alarm();
-  return 0;
-}
-
-
-
-static void trans_test_tf(u32_t arg, void *argp) {
-  APP_set_transducer(FALSE);
-}
-
-static int f_test_trans(char *arg) {
-  static task_timer trans_test_timer;
-  if (strcmp("constant", arg)) {
-    task *t = TASK_create(trans_test_tf, 0);
-    ASSERT(t);
-    TASK_start_timer(t, &trans_test_timer, 0, 0, 1000, 0, "transtesttim");
-  }
-  APP_set_transducer(TRUE);
-  return 0;
-}
 
 
 static int f_rand() {

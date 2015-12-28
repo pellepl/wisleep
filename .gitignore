@@ -9,4 +9,5 @@ build-number.txt
 *.s#*
 config_header.h
 *~
+_stm32flash.script
 

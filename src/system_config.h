@@ -61,6 +61,74 @@
 #define UART2_GPIO_TX         GPIO_Pin_2
 #endif
 
+/** SPI **/
+
+#ifdef CONFIG_SPI
+
+// make SPI driver use polling method, otherwise DMA requests are used
+// warning - polling method should only be used for debugging and may be
+// unstable. Do not sent multitudes of data using this config
+//#define CONFIG_SPI_POLL
+
+// on some stm32f1s it seems to be a bad idea closing down the SPI between
+// operations
+#define CONFIG_SPI_KEEP_RUNNING
+
+#ifdef CONFIG_SPI1
+
+#define SPI1_MASTER_GPIO              GPIOA
+#define SPI1_MASTER_GPIO_CLK          RCC_APB2Periph_GPIOA
+#define SPI1_MASTER_PIN_SCK           GPIO_Pin_5
+#define SPI1_MASTER_PIN_MISO          GPIO_Pin_6
+#define SPI1_MASTER_PIN_MOSI          GPIO_Pin_7
+
+#define SPI1_MASTER                   SPI1
+#define SPI1_MASTER_BASE              SPI1_BASE
+#define SPI1_MASTER_CLK               RCC_APB2Periph_SPI1
+#define SPI1_MASTER_DMA               DMA1
+#define SPI1_MASTER_DMA_CLK           RCC_AHBPeriph_DMA1
+// according to userguide table 78
+#define SPI1_MASTER_Rx_DMA_Channel    DMA1_Channel2
+#define SPI1_MASTER_Tx_DMA_Channel    DMA1_Channel3
+#define SPI1_MASTER_Rx_IRQ_Channel    DMA1_Channel2_IRQn
+#define SPI1_MASTER_Tx_IRQ_Channel    DMA1_Channel3_IRQn
+
+#endif // CONFIG_SPI1
+
+#ifdef CONFIG_SPI2
+
+#define SPI2_MASTER_GPIO              GPIOB
+#define SPI2_MASTER_GPIO_CLK          RCC_APB2Periph_GPIOB
+#define SPI2_MASTER_PIN_SCK           GPIO_Pin_13
+#define SPI2_MASTER_PIN_MISO          GPIO_Pin_14
+#define SPI2_MASTER_PIN_MOSI          GPIO_Pin_15
+
+#define SPI2_MASTER                   SPI2
+#define SPI2_MASTER_BASE              SPI2_BASE
+#define SPI2_MASTER_CLK               RCC_APB1Periph_SPI2
+#define SPI2_MASTER_DMA               DMA1
+#define SPI2_MASTER_DMA_CLK           RCC_AHBPeriph_DMA1
+// according to userguide table 78
+#define SPI2_MASTER_Rx_DMA_Channel    DMA1_Channel4
+#define SPI2_MASTER_Tx_DMA_Channel    DMA1_Channel5
+#define SPI2_MASTER_Rx_IRQ_Channel    DMA1_Channel4_IRQn
+#define SPI2_MASTER_Tx_IRQ_Channel    DMA1_Channel5_IRQn
+
+#endif // CONFIG_SPI2
+
+#endif // CONFIG_SPI
+
+/** I2C **/
+
+#ifdef CONFIG_I2C
+
+#define I2C1_CLK                      RCC_APB1Periph_I2C2
+#define I2C1_PORT                     I2C2
+
+#define I2C_MAX_ID                    1
+
+#endif
+
 
 /****************************************************/
 /******** Application build time configuration ******/
