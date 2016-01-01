@@ -13,19 +13,20 @@
 #include "stm32f10x.h"
 
 
-#define APP_NAME "WIFIDO"
+#define APP_NAME "WISLEEP"
 
+#define WS2812B_NBR_OF_LEDS 30
 
 /****************************************/
 /***** Functionality block settings *****/
 /****************************************/
 
 
-// enable uart1
+// enable uart
 #define CONFIG_UART2
-
 #define CONFIG_UART_CNT   1 // update according to enabled uarts
 
+#define CONFIG_SPI1
 
 /*********************************************/
 /***** Hardware build time configuration *****/

@@ -10,6 +10,12 @@
 #include "linker_symaccess.h"
 #include "app.h"
 #include "gpio.h"
+#ifdef CONFIG_SPI
+#include "spi_driver.h"
+#endif
+#ifdef CONFIG_I2C
+#include "i2c_driver.h"
+#endif
 
 static void app_assert_cb(void) {
   APP_shutdown();
@@ -29,6 +35,14 @@ int main(void) {
   SYS_set_assert_callback(app_assert_cb);
 
   IO_define(IOSTD, io_uart, UARTSTDIN);
+
+#ifdef CONFIG_SPI
+  SPI_init();
+#endif
+
+#ifdef CONFIG_I2C
+  I2C_init();
+#endif
 
   print("\n\n\nHardware initialization done\n");
 

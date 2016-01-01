@@ -11,6 +11,7 @@
 #include "miniutils.h"
 #include "uart_driver.h"
 #include "cli.h"
+#include "taskq.h"
 
 void TIMER_irq() {
   if (TIM_GetITStatus(STM32_SYSTEM_TIMER, TIM_IT_Update) != RESET) {

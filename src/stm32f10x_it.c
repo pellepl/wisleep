@@ -164,12 +164,12 @@ void DMA1_Channel4_IRQHandler() {
   SPI_irq(&__spi_bus_vec[1]);
   TRACE_IRQ_EXIT(DMA1_Channel4_IRQn);
 }
-void DMA1_Channel5_IRQHandler() {
-  // DMA1 Channel 5 SPI2 TX
-  TRACE_IRQ_ENTER(DMA1_Channel5_IRQn);
-  SPI_irq(&__spi_bus_vec[1]);
-  TRACE_IRQ_EXIT(DMA1_Channel5_IRQn);
-}
+//void DMA1_Channel5_IRQHandler() {
+//  // DMA1 Channel 5 SPI2 TX
+//  TRACE_IRQ_ENTER(DMA1_Channel5_IRQn);
+//  SPI_irq(&__spi_bus_vec[1]);
+//  TRACE_IRQ_EXIT(DMA1_Channel5_IRQn);
+//}
 #endif
 
 #ifdef CONFIG_I2C

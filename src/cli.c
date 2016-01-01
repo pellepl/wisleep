@@ -15,6 +15,17 @@
 
 #include "gpio.h"
 
+#ifdef CONFIG_I2C
+#include "i2c_driver.h"
+#ifdef CONFIG_I2C_DEVICE
+#include "i2c_dev.h"
+#include "hmc5883l_driver.h"
+#endif
+#endif
+
+#include "ws2812b_spi_stm32f1.h"
+
+
 #define CLI_PROMPT "> "
 #define IS_STRING(s) ((u8_t*)(s) >= (u8_t*)in && (u8_t*)(s) < (u8_t*)in + sizeof(in))
 
@@ -53,6 +64,21 @@ static int f_build();
 
 static int f_memfind(int hex);
 
+#ifdef CONFIG_I2C
+static int f_i2c_read(int addr, int reg);
+static int f_i2c_write(int addr, int reg, int data);
+static int f_i2c_scan(void);
+static int f_i2c_reset(void);
+
+static int f_hmc_open(void);
+static int f_hmc_cfg(void);
+static int f_hmc_check(void);
+static int f_hmc_read(void);
+static int f_hmc_drdy(void);
+#endif
+
+static int f_ws_test(int seq);
+
 static void cli_print_app_name(void);
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -83,6 +109,41 @@ static cmd c_tbl[] = {
         "uconf <uart> <speed>\n"
             "ex: uconf 2 9600\n"
     },
+
+
+#ifdef CONFIG_I2C
+    { .name = "i2c_r", .fn = (func) f_i2c_read,
+        .help = "i2c read reg\n"
+    },
+    { .name = "i2c_w", .fn = (func) f_i2c_write,
+        .help = "i2c write reg\n"
+    },
+    { .name = "i2c_scan", .fn = (func) f_i2c_scan,
+        .help = "scans i2c bus for all addresses\n"
+    },
+    { .name = "i2c_reset", .fn = (func) f_i2c_reset,
+        .help = "reset i2c bus\n"
+    },
+
+    { .name = "hmc_open", .fn = (func) f_hmc_open,
+        .help = "Open HMC device\n"
+    },
+    { .name = "hmc_cfg", .fn = (func) f_hmc_cfg,
+        .help = "Configures HMC\n"
+    },
+    { .name = "hmc_check", .fn = (func) f_hmc_check,
+        .help = "Check HMC ID\n"
+    },
+    { .name = "hmc_read", .fn = (func) f_hmc_read,
+        .help = "Read HMC data\n"
+    },
+    { .name = "hmc_drdy", .fn = (func) f_hmc_drdy,
+        .help = "Check HMC data ready\n"
+    },
+#endif
+
+    { .name = "ws_test", .fn = (func) f_ws_test,
+        .help = "test ws2812b driver\nws_test <0-?> - arg is different sequences\n" },
 
 
     { .name = "dbg", .fn = (func) f_dbg,
@@ -295,6 +356,206 @@ static int f_uconf(int uart, int speed) {
   return 0;
 }
 
+
+#ifdef CONFIG_I2C
+
+static u8_t i2c_dev_reg = 0;
+static u8_t i2c_dev_val = 0;
+static i2c_dev i2c_device;
+static u8_t i2c_wr_data[2];
+static i2c_dev_sequence i2c_r_seqs[] = {
+    I2C_SEQ_TX(&i2c_dev_reg, 1),
+    I2C_SEQ_RX_STOP(&i2c_dev_val, 1)
+};
+static i2c_dev_sequence i2c_w_seqs[] = {
+    I2C_SEQ_TX_STOP(i2c_wr_data, 2) ,
+};
+
+static void i2c_test_cb(i2c_dev *dev, int result) {
+  print("i2c_dev_cb: reg:0x%02x val:0x%02x 0b%08b res:%i\n", i2c_dev_reg, i2c_dev_val, i2c_dev_val,
+      result);
+  I2C_DEV_close(&i2c_device);
+}
+
+static int f_i2c_read(int addr, int reg) {
+  I2C_DEV_init(&i2c_device, 100000, _I2C_BUS(0), addr);
+  I2C_DEV_set_callback(&i2c_device, i2c_test_cb);
+  I2C_DEV_open(&i2c_device);
+  i2c_dev_reg = reg;
+  int res = I2C_DEV_sequence(&i2c_device, i2c_r_seqs, 2);
+  if (res != I2C_OK) print("err: %i\n", res);
+  return 0;
+}
+
+static int f_i2c_write(int addr, int reg, int data) {
+  I2C_DEV_init(&i2c_device, 100000, _I2C_BUS(0), addr);
+  I2C_DEV_set_callback(&i2c_device, i2c_test_cb);
+  I2C_DEV_open(&i2c_device);
+  i2c_wr_data[0] = reg;
+  i2c_wr_data[1] = data;
+  i2c_dev_reg = reg;
+  i2c_dev_val = data;
+  int res = I2C_DEV_sequence(&i2c_device, i2c_w_seqs, 1);
+  if (res != I2C_OK) print("err: %i\n", res);
+  return 0;
+}
+
+static u8_t i2c_scan_addr;
+extern task_mutex i2c_mutex;
+
+void i2c_scan_report_task(u32_t addr, void *res) {
+  if (addr == 0) {
+    print("\n    0  2  4  6  8  a  c  e");
+  }
+  if ((addr & 0x0f) == 0) {
+    print("\n%02x ", addr & 0xf0);
+  }
+
+  print("%s", (char *) res);
+
+  if (i2c_scan_addr < 0xee) {
+    i2c_scan_addr += 2;
+    I2C_query(_I2C_BUS(0), i2c_scan_addr);
+  } else {
+    print("\n");
+    TASK_mutex_unlock(&i2c_mutex);
+  }
+}
+
+static void i2c_scan_cb_irq(i2c_bus *bus, int res) {
+  task *report_scan_task = TASK_create(i2c_scan_report_task, 0);
+
+  TASK_run(report_scan_task, bus->addr & 0xfe, res == I2C_OK ? "UP " : ".. ");
+}
+
+static int f_i2c_scan(void) {
+  if (!TASK_mutex_try_lock(&i2c_mutex)) {
+    print("i2c busy\n");
+    return 0;
+  }
+  i2c_scan_addr = 0;
+  int res = I2C_config(_I2C_BUS(0), 10000);
+  if (res != I2C_OK) print("i2c config err %i\n", res);
+  res = I2C_set_callback(_I2C_BUS(0), i2c_scan_cb_irq);
+  if (res != I2C_OK) print("i2c cb err %i\n", res);
+  res = I2C_query(_I2C_BUS(0), i2c_scan_addr);
+  if (res != I2C_OK) print("i2c query err %i\n", res);
+  return 0;
+}
+
+static int f_i2c_reset(void) {
+  I2C_reset(_I2C_BUS(0));
+  // force release of i2c mutex
+  TASK_mutex_try_lock(&i2c_mutex);
+  TASK_mutex_unlock(&i2c_mutex);
+  return 0;
+}
+
+static hmc5883l_dev hmc_dev;
+static hmc_reading hmc_data;
+static bool hmc_bool;
+
+static void hmc_cb(hmc5883l_dev *dev, hmc_state state, int res) {
+  if (res < 0) print("hmc_cb err %i\n", res);
+  switch (state) {
+  case HCM5883L_STATE_CONFIG:
+    print("hmc cfg ok\n");
+    break;
+  case HCM5883L_STATE_READ:
+    print("hmc x:%i  y:%i  z:%i\n", hmc_data.x, hmc_data.y, hmc_data.z);
+    break;
+  case HCM5883L_STATE_READ_DRDY:
+    print("hmc drdy: %s\n", hmc_bool ? "TRUE":"FALSE");
+    break;
+  case HCM5883L_STATE_ID:
+    print("hmc id ok: %s\n", hmc_bool ? "TRUE":"FALSE");
+    break;
+  default:
+    print("hmc_cb unknown state %02x\n", res);
+    break;
+  }
+}
+
+static int f_hmc_open(void) {
+  hmc_open(&hmc_dev, _I2C_BUS(0), 100000, hmc_cb);
+  return 0;
+}
+static int f_hmc_cfg(void) {
+  int res = hmc_config(&hmc_dev,
+      hmc5883l_mode_continuous,
+      hmc5883l_i2c_speed_normal,
+      hmc5883l_gain_1_3,
+      hmc5883l_measurement_mode_normal,
+      hmc5883l_data_output_3,
+      hmc5883l_samples_avg_2);
+  if (res != 0) print("err:%i\n", res);
+  return 0;
+}
+static int f_hmc_check(void) {
+  int res = hmc_check_id(&hmc_dev, &hmc_bool);
+  if (res != 0) print("err:%i\n", res);
+  return 0;
+}
+static int f_hmc_read(void) {
+  int res = hmc_read(&hmc_dev, &hmc_data);
+  if (res != 0) print("err:%i\n", res);
+  return 0;
+}
+static int f_hmc_drdy(void) {
+  int res = hmc_drdy(&hmc_dev, &hmc_bool);
+  if (res != 0) print("err:%i\n", res);
+  return 0;
+}
+
+
+#endif // CONFIG_I2C
+
+static int f_ws_test(int seq) {
+  u32_t rgb = 0;
+  if (seq == 100) {
+    WS2812B_STM32F1_output_test_pattern();
+    return 0;
+  }
+  switch (seq % 10) {
+  case 1:
+    rgb = 0x404040; break;
+  case 2:
+    rgb = 0x000040; break;
+  case 3:
+    rgb = 0x004000; break;
+  case 4:
+    rgb = 0x400000; break;
+  case 5:
+    rgb = 0x004040; break;
+  case 6:
+    rgb = 0x400040; break;
+  case 7:
+    rgb = 0x404000; break;
+  }
+  if (seq < 10) {
+    int i;
+    for (i = 0; i < WS2812B_NBR_OF_LEDS; i++) {
+      WS2812B_STM32F1_set(rgb);
+    }
+    WS2812B_STM32F1_output();
+  } else {
+    int j;
+    for (j = 0; j < 24; j++) {
+      int i;
+      for (i = 0; i < WS2812B_NBR_OF_LEDS; i++) {
+        WS2812B_STM32F1_set(i == j ? rgb : 0);
+      }
+      WS2812B_STM32F1_output();
+      SYS_hardsleep_ms(50);
+    }
+
+  }
+
+  return 0;
+}
+
+
+
 static int f_help(char *s) {
   if (IS_STRING(s)) {
     int i = 0;
@@ -331,6 +592,16 @@ static int f_dump() {
   print("FULL DUMP\n=========\n");
   TASK_dump(IOSTD);
   print("\n");
+  print("APP specifics\n-------------\n");
+  print("I2C mutex\n");
+  print("  taken: %s\n", i2c_mutex.taken ? "YES":"NO");
+  if (i2c_mutex.taken) {
+    print("  entries: %i\n", i2c_mutex.entries);
+    print("  owner:   0x%08x  [func:0x%08x]\n", i2c_mutex.owner, i2c_mutex.owner->f);
+    print("  reentr.: %s\n", i2c_mutex.reentrant ? "YES":"NO");
+  }
+  print("\n");
+
   return 0;
 }
 
