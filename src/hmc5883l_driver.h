@@ -5,8 +5,8 @@
  *      Author: petera
  */
 
-#ifndef SRC_HMC5883L_DRIVER_H_
-#define SRC_HMC5883L_DRIVER_H_
+#ifndef HMC5883L_DRIVER_H_
+#define HMC5883L_DRIVER_H_
 
 #include "i2c_dev.h"
 #include "hmc5883l_hw.h"
@@ -72,11 +72,11 @@ typedef struct {
 } hmc_reading;
 
 typedef enum {
-  HCM5883L_STATE_IDLE = 0,
-  HCM5883L_STATE_CONFIG,
-  HCM5883L_STATE_READ,
-  HCM5883L_STATE_READ_DRDY,
-  HCM5883L_STATE_ID,
+  HMC5883L_STATE_IDLE = 0,
+  HMC5883L_STATE_CONFIG,
+  HMC5883L_STATE_READ,
+  HMC5883L_STATE_READ_DRDY,
+  HMC5883L_STATE_ID,
 } hmc_state;
 
 typedef struct hmc5883l_dev_s {
@@ -106,4 +106,4 @@ int hmc_config(hmc5883l_dev *dev,
 int hmc_read(hmc5883l_dev *dev, hmc_reading *data);
 int hmc_drdy(hmc5883l_dev *dev, bool *drdy);
 
-#endif /* SRC_HMC5883L_DRIVER_H_ */
+#endif /* HMC5883L_DRIVER_H_ */

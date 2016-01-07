@@ -458,16 +458,16 @@ static bool hmc_bool;
 static void hmc_cb(hmc5883l_dev *dev, hmc_state state, int res) {
   if (res < 0) print("hmc_cb err %i\n", res);
   switch (state) {
-  case HCM5883L_STATE_CONFIG:
+  case HMC5883L_STATE_CONFIG:
     print("hmc cfg ok\n");
     break;
-  case HCM5883L_STATE_READ:
+  case HMC5883L_STATE_READ:
     print("hmc x:%i  y:%i  z:%i\n", hmc_data.x, hmc_data.y, hmc_data.z);
     break;
-  case HCM5883L_STATE_READ_DRDY:
+  case HMC5883L_STATE_READ_DRDY:
     print("hmc drdy: %s\n", hmc_bool ? "TRUE":"FALSE");
     break;
-  case HCM5883L_STATE_ID:
+  case HMC5883L_STATE_ID:
     print("hmc id ok: %s\n", hmc_bool ? "TRUE":"FALSE");
     break;
   default:
@@ -487,7 +487,7 @@ static int f_hmc_cfg(void) {
       hmc5883l_gain_1_3,
       hmc5883l_measurement_mode_normal,
       hmc5883l_data_output_3,
-      hmc5883l_samples_avg_2);
+      hmc5883l_samples_avg_4);
   if (res != 0) print("err:%i\n", res);
   return 0;
 }

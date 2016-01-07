@@ -12,16 +12,16 @@ static void hmc_cb(i2c_dev *idev, int res) {
   hmc5883l_dev *dev = (hmc5883l_dev *)I2C_DEV_get_user_data(idev);
   hmc_state old_state = dev->state;
   if (res != I2C_OK) {
-    dev->state = HCM5883L_STATE_IDLE;
+    dev->state = HMC5883L_STATE_IDLE;
     if (dev->callback) dev->callback(dev, old_state, res);
     return;
   }
 
   switch (dev->state) {
-  case HCM5883L_STATE_CONFIG:
+  case HMC5883L_STATE_CONFIG:
     break;
 
-  case HCM5883L_STATE_READ:
+  case HMC5883L_STATE_READ:
     if (dev->arg.data) {
       dev->arg.data->x = (dev->tmp_buf[1] << 8) | dev->tmp_buf[2];
       dev->arg.data->y = (dev->tmp_buf[3] << 8) | dev->tmp_buf[4];
@@ -29,13 +29,13 @@ static void hmc_cb(i2c_dev *idev, int res) {
     }
     break;
 
-  case HCM5883L_STATE_READ_DRDY:
+  case HMC5883L_STATE_READ_DRDY:
     if (dev->arg.drdy) {
       *dev->arg.drdy = dev->tmp_buf[1] & HMC5883L_R_SR_RDY_MASK;
     }
     break;
 
-  case HCM5883L_STATE_ID:
+  case HMC5883L_STATE_ID:
     if (dev->arg.id_ok) {
       *dev->arg.id_ok =
           dev->tmp_buf[1] == HMC5883L_ID_A &&
@@ -44,12 +44,12 @@ static void hmc_cb(i2c_dev *idev, int res) {
     }
     break;
 
-  case HCM5883L_STATE_IDLE:
+  case HMC5883L_STATE_IDLE:
     res = I2C_ERR_HMC5883L_STATE;
     break;
   }
 
-  dev->state = HCM5883L_STATE_IDLE;
+  dev->state = HMC5883L_STATE_IDLE;
 
   if (dev->callback) dev->callback(dev, old_state, res);
 }
@@ -95,10 +95,10 @@ int hmc_config(hmc5883l_dev *dev,
   I2C_SEQ_TX_STOP_C(dev->seq[1], &dev->tmp_buf[2], 2);
   I2C_SEQ_TX_STOP_C(dev->seq[2], &dev->tmp_buf[4], 2);
 
-  dev->state = HCM5883L_STATE_CONFIG;
+  dev->state = HMC5883L_STATE_CONFIG;
   int res = I2C_DEV_sequence(&dev->i2c_dev, &dev->seq[0], 3);
   if (res != I2C_OK) {
-    dev->state = HCM5883L_STATE_IDLE;
+    dev->state = HMC5883L_STATE_IDLE;
   }
 
   return res;
@@ -113,10 +113,10 @@ int hmc_read(hmc5883l_dev *dev, hmc_reading *data) {
   dev->tmp_buf[0] = HMC5883L_R_X_MSB;
   I2C_SEQ_TX_C(dev->seq[0], &dev->tmp_buf[0], 1);
   I2C_SEQ_RX_STOP_C(dev->seq[1], &dev->tmp_buf[1], 6);
-  dev->state = HCM5883L_STATE_READ;
+  dev->state = HMC5883L_STATE_READ;
   int res = I2C_DEV_sequence(&dev->i2c_dev, &dev->seq[0], 2);
   if (res != I2C_OK) {
-    dev->state = HCM5883L_STATE_IDLE;
+    dev->state = HMC5883L_STATE_IDLE;
   }
 
   return res;
@@ -131,10 +131,10 @@ int hmc_check_id(hmc5883l_dev *dev, bool *id_ok) {
   dev->tmp_buf[0] = HMC5883L_R_ID_A;
   I2C_SEQ_TX_C(dev->seq[0], &dev->tmp_buf[0], 1);
   I2C_SEQ_RX_STOP_C(dev->seq[1], &dev->tmp_buf[1], 3);
-  dev->state = HCM5883L_STATE_ID;
+  dev->state = HMC5883L_STATE_ID;
   int res = I2C_DEV_sequence(&dev->i2c_dev, &dev->seq[0], 2);
   if (res != I2C_OK) {
-    dev->state = HCM5883L_STATE_IDLE;
+    dev->state = HMC5883L_STATE_IDLE;
   }
 
   return res;
@@ -149,10 +149,10 @@ int hmc_drdy(hmc5883l_dev *dev, bool *drdy) {
   dev->tmp_buf[0] = HMC5883L_R_SR;
   I2C_SEQ_TX_C(dev->seq[0], &dev->tmp_buf[0], 1);
   I2C_SEQ_RX_STOP_C(dev->seq[1], &dev->tmp_buf[1], 1);
-  dev->state = HCM5883L_STATE_READ_DRDY;
+  dev->state = HMC5883L_STATE_READ_DRDY;
   int res = I2C_DEV_sequence(&dev->i2c_dev, &dev->seq[0], 2);
   if (res != I2C_OK) {
-    dev->state = HCM5883L_STATE_IDLE;
+    dev->state = HMC5883L_STATE_IDLE;
   }
 
   return res;
