@@ -15,7 +15,7 @@
 
 #define APP_NAME "WISLEEP"
 
-#define WS2812B_NBR_OF_LEDS 30
+#define WS2812B_NBR_OF_LEDS 16
 
 /****************************************/
 /***** Functionality block settings *****/

@@ -549,6 +549,26 @@ static int f_adxl_check(void) {
 static int f_ws_test(int seq) {
   u32_t rgb = 0;
   if (seq == 100) {
+    for (rgb = 0; rgb < 1000; rgb++) {
+      WS2812B_STM32F1_set(rand_next());
+      if (rgb != 0 && (rgb % WS2812B_NBR_OF_LEDS) == 0) {
+        WS2812B_STM32F1_output();
+        SYS_hardsleep_ms(75);
+      }
+    }
+    return 0;
+  }
+  if (seq == 200) {
+    for (rgb = 0; rgb < 1000; rgb++) {
+      WS2812B_STM32F1_set(0x010101 * (rgb & 0xff));
+      if (rgb != 0 && (rgb % WS2812B_NBR_OF_LEDS) == 0) {
+        WS2812B_STM32F1_output();
+        SYS_hardsleep_ms(75);
+      }
+    }
+    return 0;
+  }
+  if (seq == 1000) {
     WS2812B_STM32F1_output_test_pattern();
     return 0;
   }

@@ -22,8 +22,8 @@
  *
  * STM32
  * SPI2 bus is on APB1 clock = CPU/2 = 36 MHz
- * Divide codes into 4 steps => 0.8MHz * 4 = 3.2 MHz
- *
+ * Divide codes into 3 steps => 0.8MHz * 3 = 2.4 MHz
+ *   36/2.4 = 15 optimal divider, use 16
  *
  *
  */
@@ -37,19 +37,19 @@
 #define WS2812B_NBR_OF_LEDS 24
 #endif
 
-#define RESET_ZEROES              0 //32
+#define RESET_ZEROES              16
 #define RESET_ONES                0
-#define RESET                     (RESET_ZEROES + RESET_ONES)
-#define CODED_BYTES_PER_RGB_BYTE  4
+#define RESET_LEN                 (RESET_ZEROES + RESET_ONES)
+
+#define CODED_BYTES_PER_RGB_BYTE  3
 
 #define RGB_DATA_LEN \
   (3 * WS2812B_NBR_OF_LEDS * CODED_BYTES_PER_RGB_BYTE)
 
+#define CODE0 0b100
+#define CODE1 0b110
 
-#define CODE0 0b1000
-#define CODE1 0b1110
-
-static u8_t rgb_data[RESET + RGB_DATA_LEN + RESET + 1];
+static u8_t rgb_data[RESET_LEN + RGB_DATA_LEN + RESET_LEN + 1];
 static u32_t rgb_ix;
 static void (* _cb)(bool error);
 
@@ -99,29 +99,30 @@ void WS2812B_STM32F1_init(void (* callback)(bool error)) {
   // config io
   // pin B15 WS2812B as output high
   gpio_config(PORTB, PIN15, CLK_50MHZ, OUT, AF0, PUSHPULL, NOPULL);
-  gpio_set(PORTB, PIN15, 0);
+  gpio_disable(PORTB, PIN15);
 
-  memset(rgb_data, 0xff, sizeof(rgb_data));
+  memset(rgb_data, 0x00, sizeof(rgb_data));
+
   memset(rgb_data, 0x00, RESET_ZEROES);
-  memset(&rgb_data[RESET + RGB_DATA_LEN], 0x00, RESET_ZEROES);
-  rgb_ix = RESET;
+  memset(&rgb_data[RESET_LEN + RGB_DATA_LEN], 0x00, RESET_ZEROES);
+
+  rgb_ix = RESET_LEN;
 }
 
 void ws2812b_stm32f1_codify(u8_t d) {
-  if (rgb_ix >= RESET + RGB_DATA_LEN) return;
+  if (rgb_ix >= RESET_LEN + RGB_DATA_LEN) return;
+  //012345670123456701234567
+  //00_11_22_33_44_55_66_77_
   int i;
-  for (i = 0; i < 4; i++) {
-    u8_t o = 0;
-    u8_t b;
-    b = d & 0b10000000;
-    o |= (b ? CODE1 : CODE0) << 4;
+  u32_t o = 0;
+  for (i = 0; i < 8; i++) {
+    o <<= 3;
+    o |= d & 0b10000000 ? CODE1 : CODE0;
     d <<= 1;
-    b = d & 0b10000000;
-    o |= (b ? CODE1 : CODE0);
-    d <<= 1;
-
-    rgb_data[rgb_ix++] = o;
   }
+  rgb_data[rgb_ix++] = (o >> 16) & 0xff;
+  rgb_data[rgb_ix++] = (o >> 8) & 0xff;
+  rgb_data[rgb_ix++] = o & 0xff;
 }
 
 void WS2812B_STM32F1_set(u32_t rgb) {
@@ -132,16 +133,11 @@ void WS2812B_STM32F1_set(u32_t rgb) {
 }
 
 void WS2812B_STM32F1_output(void) {
-  gpio_config(PORTB, PIN15, CLK_50MHZ, OUT, AF0, PUSHPULL, NOPULL);
-  gpio_disable(PORTB, PIN15);
-  SYS_hardsleep_ms(1);
-  gpio_enable(PORTB, PIN15);
-
   gpio_config(PORTB, PIN15, CLK_50MHZ, AF, AF0, PUSHPULL, NOPULL);
 
   DMA1_Channel5->CCR &= (u16_t)(~DMA_CCR1_EN);
 
-  DMA1_Channel5->CNDTR = RESET + RGB_DATA_LEN + RESET + 1;
+  DMA1_Channel5->CNDTR = RESET_LEN + RGB_DATA_LEN + RESET_LEN + 1;
   DMA1_Channel5->CMAR = (u32_t)(&rgb_data[0]);
 
   DMA1_Channel5->CCR |= DMA_CCR1_EN;
@@ -153,14 +149,14 @@ void WS2812B_STM32F1_output(void) {
 void WS2812B_STM32F1_output_test_pattern(void) {
   int i;
   for (i = 0; i < RGB_DATA_LEN; i++) {
-    rgb_data[RESET + i] = 0xaa;
+    rgb_data[RESET_LEN + i] = 0xaa;
   }
   gpio_config(PORTB, PIN15, CLK_50MHZ, AF, AF0, PUSHPULL, NOPULL);
 
   DMA1_Channel5->CCR &= (u16_t)(~DMA_CCR1_EN);
 
   DMA1_Channel5->CNDTR = RGB_DATA_LEN;
-  DMA1_Channel5->CMAR = (u32_t)(&rgb_data[RESET]);
+  DMA1_Channel5->CMAR = (u32_t)(&rgb_data[RESET_LEN]);
 
   DMA1_Channel5->CCR |= DMA_CCR1_EN;
   SPI2->CR1 |= 0x0040;
@@ -181,13 +177,6 @@ void DMA1_Channel5_IRQHandler() {
     DMA_ClearITPendingBit(DMA1_IT_TE5);
   }
   if (do_call && _cb) {
-    // config io
-    // pin B15 WS2812B as output high
-    gpio_config(PORTB, PIN15, CLK_50MHZ, OUT, AF0, PUSHPULL, NOPULL);
-    gpio_disable(PORTB, PIN15);
-    SYS_hardsleep_ms(1);
-    gpio_enable(PORTB, PIN15);
-
     _cb(err);
   }
 }
