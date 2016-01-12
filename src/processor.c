@@ -34,8 +34,8 @@ static void RCC_config() {
 
   RCC_APB1PeriphClockCmd(STM32_SYSTEM_TIMER_RCC, ENABLE);
 
-  /* PCLK1 = HCLK/1 */
-  RCC_PCLK1Config(RCC_HCLK_Div1);
+  RCC_PCLK1Config(RCC_HCLK_Div2); // APB1 = HCLK/2
+  RCC_PCLK2Config(RCC_HCLK_Div1); // APB2 = HCLK/1
 
 
 #ifdef CONFIG_SPI

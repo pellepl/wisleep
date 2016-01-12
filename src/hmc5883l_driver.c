@@ -56,6 +56,7 @@ static void hmc_cb(i2c_dev *idev, int res) {
 
 void hmc_open(hmc5883l_dev *dev, i2c_bus *bus, u32_t clock,
     void (*hmc_callback)(hmc5883l_dev *dev, hmc_state state, int res)) {
+  memset(dev, 0, sizeof(hmc5883l_dev));
   I2C_DEV_init(&dev->i2c_dev, clock, bus, HMC5883L_I2C_ADDR);
   I2C_DEV_set_user_data(&dev->i2c_dev, dev);
   I2C_DEV_set_callback(&dev->i2c_dev, hmc_cb);

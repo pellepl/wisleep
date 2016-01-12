@@ -20,6 +20,7 @@
 #ifdef CONFIG_I2C_DEVICE
 #include "i2c_dev.h"
 #include "hmc5883l_driver.h"
+#include "adxl345_driver.h"
 #endif
 #endif
 
@@ -75,6 +76,9 @@ static int f_hmc_cfg(void);
 static int f_hmc_check(void);
 static int f_hmc_read(void);
 static int f_hmc_drdy(void);
+
+static int f_adxl_open(void);
+static int f_adxl_check(void);
 #endif
 
 static int f_ws_test(int seq);
@@ -140,6 +144,14 @@ static cmd c_tbl[] = {
     { .name = "hmc_drdy", .fn = (func) f_hmc_drdy,
         .help = "Check HMC data ready\n"
     },
+
+    { .name = "adxl_open", .fn = (func) f_adxl_open,
+        .help = "Open ADXL device\n"
+    },
+    { .name = "adxl_check", .fn = (func) f_adxl_check,
+        .help = "Check ADXL ID\n"
+    },
+
 #endif
 
     { .name = "ws_test", .fn = (func) f_ws_test,
@@ -471,7 +483,7 @@ static void hmc_cb(hmc5883l_dev *dev, hmc_state state, int res) {
     print("hmc id ok: %s\n", hmc_bool ? "TRUE":"FALSE");
     break;
   default:
-    print("hmc_cb unknown state %02x\n", res);
+    print("hmc_cb unknown state %02x\n", state);
     break;
   }
 }
@@ -507,6 +519,30 @@ static int f_hmc_drdy(void) {
   return 0;
 }
 
+static adxl345_dev adxl_dev;
+static bool adxl_bool;
+
+static void adxl_cb(adxl345_dev *dev, adxl_state state, int res) {
+  if (res < 0) print("adxl_cb err %i\n", res);
+  switch (state) {
+  case ADXL345_STATE_ID:
+    print("adxl id ok: %s\n", adxl_bool ? "TRUE":"FALSE");
+    break;
+  default:
+    print("adxl_cb unknown state %02x\n", state);
+    break;
+  }
+}
+
+static int f_adxl_open(void) {
+  adxl_open(&adxl_dev, _I2C_BUS(0), 100000, adxl_cb);
+  return 0;
+}
+static int f_adxl_check(void) {
+  int res = adxl_check_id(&adxl_dev, &adxl_bool);
+  if (res != 0) print("err:%i\n", res);
+  return 0;
+}
 
 #endif // CONFIG_I2C
 
@@ -546,7 +582,7 @@ static int f_ws_test(int seq) {
         WS2812B_STM32F1_set(i == j ? rgb : 0);
       }
       WS2812B_STM32F1_output();
-      SYS_hardsleep_ms(50);
+      SYS_hardsleep_ms(100);
     }
 
   }

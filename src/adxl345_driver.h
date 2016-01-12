@@ -8,6 +8,14 @@
 #ifndef ADXL345_DRIVER_H_
 #define ADXL345_DRIVER_H_
 
+#include "i2c_dev.h"
+
+
+#define I2C_ERR_ADXL345_BUSY     -1500
+#define I2C_ERR_ADXL345_ID       -1501
+#define I2C_ERR_ADXL345_STATE    -1502
+#define I2C_ERR_ADXL345_NULLPTR  -1503
+
 #define ADXL345_R_DEVID           0x00
 #define ADXL345_R_THRESH_TAP      0x1d
 #define ADXL345_R_OFSX            0x1e
@@ -67,6 +75,59 @@ typedef enum {
   ADXL345_XYZ  = 0b111,
 } adxl_axes;
 
+typedef enum {
+  ADXL345_AC    = 0,
+  ADXL345_DC
+} adxl_acdc;
+
+typedef enum {
+  ADXL345_RATE_0_10 = 0b0000,
+  ADXL345_RATE_0_20 = 0b0001,
+  ADXL345_RATE_0_39 = 0b0010,
+  ADXL345_RATE_0_78 = 0b0011,
+  ADXL345_RATE_1_56 = 0b0100,
+  ADXL345_RATE_3_13 = 0b0101,
+  ADXL345_RATE_6_25 = 0b0110,
+  ADXL345_RATE_12_5_LP = 0b0111,
+  ADXL345_RATE_25_LP = 0b1000,
+  ADXL345_RATE_50_LP = 0b1001,
+  ADXL345_RATE_100_LP = 0b1010,
+  ADXL345_RATE_200_LP = 0b1011,
+  ADXL345_RATE_400_LP = 0b1100,
+  ADXL345_RATE_800 = 0b1101,
+  ADXL345_RATE_1600 = 0b1110,
+  ADXL345_RATE_3200 = 0b1111,
+} adxl_rate;
+
+typedef enum {
+  ADXL345_MODE_STANDBY = 0,
+  ADXL345_MODE_MEASURE
+} adxl_mode;
+
+typedef enum {
+  ADXL345_SLEEP_OFF = 0b100,
+  ADXL345_SLEEP_RATE_1 = 0b011,
+  ADXL345_SLEEP_RATE_2 = 0b010,
+  ADXL345_SLEEP_RATE_4 = 0b001,
+  ADXL345_SLEEP_RATE_8 = 0b000,
+} adxl_sleep;
+
+typedef enum {
+  ADXL345_RANGE_2G = 0b00,
+  ADXL345_RANGE_4G = 0b01,
+  ADXL345_RANGE_8G = 0b10,
+  ADXL345_RANGE_16G = 0b11,
+} adxl_range;
+
+typedef enum {
+  ADXL345_FIFO_BYPASS = 0b00,
+  ADXL345_FIFO_ENABLE = 0b01,
+  ADXL345_FIFO_STREAM = 0b10,
+  ADXL345_FIFO_TRIGGER = 0b11,
+} adxl_fifo_mode;
+
+
+
 typedef struct adxl345_dev_s {
   i2c_dev i2c_dev;
   adxl_state state;
@@ -81,8 +142,16 @@ typedef struct adxl345_dev_s {
 
 void adxl_open(adxl345_dev *dev, i2c_bus *bus, u32_t clock, void (*adxl_callback)(adxl345_dev *dev, adxl_state state, int res));
 void adxl_close(adxl345_dev *dev);
+int adxl_check_id(adxl345_dev *dev, bool *id_ok);
+
+int adxl_config_power(adxl345_dev *dev,
+    bool low_power, adxl_rate rate,
+    bool link, bool auto_sleep, adxl_mode mode,
+    adxl_sleep sleep);
+
 /**
 Configure offsets.
+@param dev      The adxl345 device struct.
 @param x, y, z  The OFSX, OFSY, and OFSZ registers are each eight bits and
                 offer user-set offset adjustments in twos complement format
                 with a scale factor of 15.6 mg/LSB (that is, 0x7F = 2 g). The
@@ -94,6 +163,7 @@ int adxl_set_offset(adxl345_dev *dev, s8_t x, s8_t y, s8_t z);
 
 /**
 Configure single/double tap detection.
+@param dev      The adxl345 device struct.
 @param tap_ena  Combination of axes enabled for tap detection.
 @param thresh   The THRESH_TAP register is eight bits and holds the threshold
                 value for tap interrupts. The data format is unsigned, therefore,
@@ -127,6 +197,7 @@ int adxl_config_tap(adxl345_dev *dev,
 
 /**
 Configure activity/inactivity detection.
+@param dev      The adxl345 device struct.
 @param ac_dc    In dc-coupled operation, the current acceleration magnitude is
                 compared directly with THRESH_ACT and THRESH_INACT to determine
                 whether activity or inactivity is detected. In ac-coupled operation
@@ -167,9 +238,10 @@ Configure activity/inactivity detection.
                 than the value in the THRESH_INACT register.
  */
 int adxl_config_activity(adxl345_dev *dev,
-    bool ac_dc, adxl_axes act_ena, adxl_axes inact_ena, u8_t thr_act, u8_t thr_inact, u8_t time_inact);
+    adxl_acdc ac_dc, adxl_axes act_ena, adxl_axes inact_ena, u8_t thr_act, u8_t thr_inact, u8_t time_inact);
 
 
-int adxl_config_freefall(adxl345_dev *dev);
+int adxl_config_freefall(adxl345_dev *dev, u8_t thresh, u8_t time);
+int adxl_config_interrupts(adxl345_dev *dev);
 
 #endif /* ADXL345_DRIVER_H_ */
