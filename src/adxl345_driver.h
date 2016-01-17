@@ -1,6 +1,8 @@
 /*
  * adxl345_driver.h
  *
+ * See http://www.analog.com/media/en/technical-documentation/data-sheets/ADXL345.PDF
+ *
  *  Created on: Jan 2, 2016
  *      Author: petera
  */
@@ -126,7 +128,25 @@ typedef enum {
   ADXL345_FIFO_TRIGGER = 0b11,
 } adxl_fifo_mode;
 
+typedef enum {
+  ADXL345_PIN_INT1 = 0b0,
+  ADXL345_PIN_INT2 = 0b1,
+} adxl_pin_int;
 
+typedef struct {
+  u8_t fifo_trig : 1;
+  u8_t _rsv : 1;
+  u8_t entries : 6;
+} __attribute (( packed )) adxl_fifo_status;
+
+#define ADXL345_INT_DATA_READY    0b10000000
+#define ADXL345_INT_SINGLE_TAP    0b01000000
+#define ADXL345_INT_DOUBLE_TAP    0b00100000
+#define ADXL345_INT_ACTIVITY      0b00010000
+#define ADXL345_INT_INACTIVITY    0b00001000
+#define ADXL345_INT_FREE_FALL     0b00000100
+#define ADXL345_INT_WATERMARK     0b00000010
+#define ADXL345_INT_OVERRUN       0b00000001
 
 typedef struct adxl345_dev_s {
   i2c_dev i2c_dev;
@@ -144,6 +164,71 @@ void adxl_open(adxl345_dev *dev, i2c_bus *bus, u32_t clock, void (*adxl_callback
 void adxl_close(adxl345_dev *dev);
 int adxl_check_id(adxl345_dev *dev, bool *id_ok);
 
+/**
+Configures power related configurations.
+@param dev        The adxl345 device struct.
+@param low_power  A setting of 0 in the LOW_POWER bit selects normal operation,
+                  and a setting of 1 selects reduced power operation, which has
+                  somewhat higher noise.
+@param rate       These bits select the device bandwidth and output data rate (see
+                  Table 7 and Table 8 for details). The default value is 0x0A, which
+                  translates to a 100 Hz output data rate. An output data rate should
+                  be selected that is appropriate for the communication protocol
+                  and frequency selected. Selecting too high of an output data rate with
+                  a low communication speed results in samples being discarded.
+@param link       A setting of 1 in the link bit with both the activity and inactivity
+                  functions enabled delays the start of the activity function until
+                  inactivity is detected. After activity is detected, inactivity detection
+                  begins, preventing the detection of activity. This bit serially links
+                  the activity and inactivity functions. When this bit is set to 0,
+                  the inactivity and activity functions are concurrent.
+                  When clearing the link bit, it is recommended that the part be
+                  placed into standby mode and then set back to measurement
+                  mode with a subsequent write. This is done to ensure that the
+                  device is properly biased if sleep mode is manually disabled;
+                  otherwise, the first few samples of data after the link bit is cleared
+                  may have additional noise, especially if the device was asleep
+                  when the bit was cleared.
+@param auto_sleep If the link bit is set, a setting of 1 in the AUTO_SLEEP bit enables
+                  the auto-sleep functionality. In this mode, the ADXL345 automatically
+                  switches to sleep mode if the inactivity function is
+                  enabled and inactivity is detected (that is, when acceleration is
+                  below the THRESH_INACT value for at least the time indicated
+                  by TIME_INACT). If activity is also enabled, the ADXL345
+                  automatically wakes up from sleep after detecting activity and
+                  returns to operation at the output data rate set in the BW_RATE
+                  register. A setting of 0 in the AUTO_SLEEP bit disables automatic
+                  switching to sleep mode.
+                  If the link bit is not set, the AUTO_SLEEP feature is disabled
+                  and setting the AUTO_SLEEP bit does not have an impact on
+                  device operation. Refer to the Link Bit section or the Link Mode
+                  section for more information on utilization of the link feature
+                  in the datasheet.
+                  When clearing the AUTO_SLEEP bit, it is recommended that the
+                  part be placed into standby mode and then set back to measurement
+                  mode with a subsequent write. This is done to ensure that
+                  the device is properly biased if sleep mode is manually disabled;
+                  otherwise, the first few samples of data after the AUTO_SLEEP
+                  bit is cleared may have additional noise, especially if the device
+                  was asleep when the bit was cleared.
+@param mode       A setting of 0 in the measure bit places the part into standby mode,
+                  and a setting of 1 places the part into measurement mode. The
+                  ADXL345 powers up in standby mode with minimum power.
+                  consumption.
+@param sleep      Sleep mode suppresses DATA_READY, stops transmission of data
+                  to FIFO, and switches the sampling rate to one specified by the
+                  argument. In sleep mode, only the activity function can be used.
+                  When the DATA_READY interrupt is suppressed, the output
+                  data registers (Register 0x32 to Register 0x37) are still updated
+                  at given sampling rate.
+                  When clearing the sleep mode, it is recommended that the part be
+                  placed into standby mode and then set back to measurement
+                  mode with a subsequent write. This is done to ensure that the
+                  device is properly biased if sleep mode is manually disabled;
+                  otherwise, the first few samples of data after the sleep mode is
+                  cleared may have additional noise, especially if the device was
+                  asleep when the bit was cleared.
+ */
 int adxl_config_power(adxl345_dev *dev,
     bool low_power, adxl_rate rate,
     bool link, bool auto_sleep, adxl_mode mode,
@@ -240,8 +325,130 @@ Configure activity/inactivity detection.
 int adxl_config_activity(adxl345_dev *dev,
     adxl_acdc ac_dc, adxl_axes act_ena, adxl_axes inact_ena, u8_t thr_act, u8_t thr_inact, u8_t time_inact);
 
+/**
+Configure freefall detection.
+@param dev      The adxl345 device struct.
+@param thresh   The THRESH_FF register is eight bits and holds the threshold
+                value, in unsigned format, for free-fall detection. The acceleration on
+                all axes is compared with the value in THRESH_FF to determine if
+                a free-fall event occurred. The scale factor is 62.5 mg/LSB. Note
+                that a value of 0 mg may result in undesirable behavior if the freefall
+                interrupt is enabled. Values between 300 mg and 600 mg
+                (0x05 to 0x09) are recommended.
+@param time     The TIME_FF register is eight bits and stores an unsigned time
+                value representing the minimum time that the value of all axes
+                must be less than THRESH_FF to generate a free-fall interrupt.
+                The scale factor is 5 ms/LSB. A value of 0 may result in undesirable
+                behavior if the free-fall interrupt is enabled. Values between 100 ms
+                and 350 ms (0x14 to 0x46) are recommended.
+ */
 
 int adxl_config_freefall(adxl345_dev *dev, u8_t thresh, u8_t time);
-int adxl_config_interrupts(adxl345_dev *dev);
+/**
+Configure interrupts.
+@param dev      The adxl345 device struct.
+@param int_ena  Combinations of ADXL345_INT_* defines. The DATA_READY,
+                watermark, and overrun bits enable only the interrupt output;
+                the functions are always enabled. It is recommended that interrupts
+                be configured before enabling their outputs.
+@param int_map  Combinations of ADXL345_INT_* defines. Any bits set to 0 in this
+                register send their respective interrupts to the INT1 pin, whereas
+                bits set to 1 send their respective interrupts to the INT2 pin. All
+                selected interrupts for a given pin are OR’ed.
+ */
 
+int adxl_config_interrupts(adxl345_dev *dev, u8_t int_ena, u8_t int_map);
+/**
+Configure format.
+@param dev      The adxl345 device struct.
+@param int_inv  A value of 0 in the INT_INVERT bit sets the interrupts to active
+                high, and a value of 1 sets the interrupts to active low
+@param full_res When this bit is set to a value of 1, the device is in full resolution
+                mode, where the output resolution increases with the g range
+                set by the range bits to maintain a 4 mg/LSB scale factor. When
+                the FULL_RES bit is set to 0, the device is in 10-bit mode, and
+                the range bits determine the maximum g range and scale factor.
+@param justify  A setting of 1 in the justify bit selects left-justified (MSB) mode,
+                and a setting of 0 selects right-justified mode with sign extension.
+@param range    Sets the g range.
+ */
+
+int adxl_config_format(adxl345_dev *dev,
+    bool int_inv, bool full_res, bool justify, adxl_range range);
+
+/**
+Configure FIFO.
+@param dev      The adxl345 device struct.
+@param mode     Bypass:  FIFO is bypassed.
+                FIFO:    FIFO collects up to 32 values and then
+                         stops collecting data, collecting new data
+                         only when FIFO is not full.
+                Stream:  FIFO holds the last 32 data values. When
+                         FIFO is full, the oldest data is overwritten
+                         with newer data.
+                Trigger: When triggered by the trigger bit, FIFO
+                         holds the last data samples before the
+                         trigger event and then continues to collect
+                         data until full. New data is collected only
+                         when FIFO is not full.
+@param trigger  A value of 0 in the trigger bit links the trigger event of trigger mode
+                to INT1, and a value of 1 links the trigger event to INT2.
+@param samples  The function of these bits depends on the FIFO mode selected.
+                Entering a value of 0 in the samples bits immediately
+                sets the watermark status bit in the INT_SOURCE register,
+                regardless of which FIFO mode is selected. Undesirable operation
+                may occur if a value of 0 is used for the samples bits when trigger
+                mode is used.
+                Bypass:   None.
+                FIFO:    Specifies how many FIFO entries are needed to
+                         trigger a watermark interrupt.
+                Stream:  Specifies how many FIFO entries are needed to
+                         trigger a watermark interrupt.
+                Trigger: Specifies how many FIFO samples are retained in
+                         the FIFO buffer before a trigger event.
+ */
+int adxl_config_fifo(adxl345_dev *dev,
+    adxl_fifo_mode mode, adxl_pin_int trigger, u8_t samples);
+
+/**
+Read axes data.
+@param dev      The adxl345 device struct.
+@param data     Pointer to a data struct which will be populated with output data.
+ */
+int adxl_read_data(adxl345_dev *dev, adxl_reading *data);
+
+/**
+Read interrupt source.
+Bits set to 1 in this register indicate that their respective functions
+have triggered an event, whereas a value of 0 indicates that the
+corresponding event has not occurred. The DATA_READY,
+watermark, and overrun bits are always set if the corresponding
+events occur, regardless of the INT_ENABLE register settings,
+and are cleared by reading data from the DATAX, DATAY, and
+DATAZ registers. The DATA_READY and watermark bits may
+require multiple reads, as indicated in the FIFO mode descriptions
+in the FIFO section. Other bits, and the corresponding interrupts,
+are cleared by reading the INT_SOURCE register.
+@param dev      The adxl345 device struct.
+@param int_src  Pointer to a byte which will be populated with combination of
+                ADXL345_INT_* defines.
+ */
+int adxl_read_interrupts(adxl345_dev *dev, u8_t *int_src);
+
+/**
+Read fifo status.
+A 1 in the FIFO_TRIG bit corresponds to a trigger event occurring,
+and a 0 means that a FIFO trigger event has not occurred.
+Entries report how many data values are stored in FIFO.
+Access to collect the data from FIFO is provided through the
+DATAX, DATAY, and DATAZ registers. FIFO reads must be
+done in burst or multiple-byte mode because each FIFO level is
+cleared after any read (single- or multiple-byte) of FIFO. FIFO
+stores a maximum of 32 entries, which equates to a maximum
+of 33 entries available at any given time because an additional
+entry is available at the output filter of the device.
+@param dev      The adxl345 device struct.
+@param int_src  Pointer to a fifo_status struct to be populated.
+*/
+int adxl_read_fifo_status(adxl345_dev *dev, adxl_fifo_status *fifo_status);
 #endif /* ADXL345_DRIVER_H_ */

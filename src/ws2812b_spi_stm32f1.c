@@ -99,12 +99,13 @@ void WS2812B_STM32F1_init(void (* callback)(bool error)) {
   // config io
   // pin B15 WS2812B as output high
   gpio_config(PORTB, PIN15, CLK_50MHZ, OUT, AF0, PUSHPULL, NOPULL);
-  gpio_disable(PORTB, PIN15);
+  gpio_enable(PORTB, PIN15);
 
   memset(rgb_data, 0x00, sizeof(rgb_data));
 
-  memset(rgb_data, 0x00, RESET_ZEROES);
-  memset(&rgb_data[RESET_LEN + RGB_DATA_LEN], 0x00, RESET_ZEROES);
+  //memset(rgb_data, 0xff, sizeof(rgb_data));
+  //memset(rgb_data, 0x00, RESET_ZEROES);
+  //memset(&rgb_data[RESET_LEN + RGB_DATA_LEN], 0x00, RESET_ZEROES);
 
   rgb_ix = RESET_LEN;
 }
@@ -177,6 +178,8 @@ void DMA1_Channel5_IRQHandler() {
     DMA_ClearITPendingBit(DMA1_IT_TE5);
   }
   if (do_call && _cb) {
+    gpio_config(PORTB, PIN15, CLK_50MHZ, OUT, AF0, PUSHPULL, NOPULL);
+    gpio_enable(PORTB, PIN15);
     _cb(err);
   }
 }

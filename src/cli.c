@@ -559,12 +559,13 @@ static int f_ws_test(int seq) {
     return 0;
   }
   if (seq == 200) {
-    for (rgb = 0; rgb < 1000; rgb++) {
-      WS2812B_STM32F1_set(0x010101 * (rgb & 0xff));
-      if (rgb != 0 && (rgb % WS2812B_NBR_OF_LEDS) == 0) {
-        WS2812B_STM32F1_output();
-        SYS_hardsleep_ms(75);
+    for (rgb = 0; rgb < 0x200; rgb++) {
+      int i;
+      for (i = 0; i < WS2812B_NBR_OF_LEDS; i++) {
+        WS2812B_STM32F1_set(0x010101 * (rgb & 0xff));
       }
+      WS2812B_STM32F1_output();
+      SYS_hardsleep_ms(50);
     }
     return 0;
   }
@@ -596,7 +597,7 @@ static int f_ws_test(int seq) {
     WS2812B_STM32F1_output();
   } else {
     int j;
-    for (j = 0; j < 24; j++) {
+    for (j = 0; j < WS2812B_NBR_OF_LEDS; j++) {
       int i;
       for (i = 0; i < WS2812B_NBR_OF_LEDS; i++) {
         WS2812B_STM32F1_set(i == j ? rgb : 0);
