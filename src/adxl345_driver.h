@@ -10,8 +10,8 @@
 #ifndef ADXL345_DRIVER_H_
 #define ADXL345_DRIVER_H_
 
+#include "system.h"
 #include "i2c_dev.h"
-
 
 #define I2C_ERR_ADXL345_BUSY     -1500
 #define I2C_ERR_ADXL345_ID       -1501
@@ -53,17 +53,26 @@
 
 #define ADXL345_I2C_ADDR          0xa6
 
-
-
 typedef struct {
   s16_t x,y,z;
 } adxl_reading;
 
 typedef enum {
   ADXL345_STATE_IDLE = 0,
-  ADXL345_STATE_CONFIG,
   ADXL345_STATE_READ,
+  ADXL345_STATE_READ_FIFO,
+  ADXL345_STATE_READ_INTERRUPTS,
+  ADXL345_STATE_READ_ACT_TAP,
+  ADXL345_STATE_READ_ALL_STATUS,
   ADXL345_STATE_ID,
+  ADXL345_STATE_CONFIG_POWER,
+  ADXL345_STATE_SET_OFFSET,
+  ADXL345_STATE_CONFIG_TAP,
+  ADXL345_STATE_CONFIG_ACTIVITY,
+  ADXL345_STATE_CONFIG_FREEFALL,
+  ADXL345_STATE_CONFIG_INTERRUPTS,
+  ADXL345_STATE_CONFIG_FORMAT,
+  ADXL345_STATE_CONFIG_FIFO,
 } adxl_state;
 
 typedef enum {
@@ -78,8 +87,8 @@ typedef enum {
 } adxl_axes;
 
 typedef enum {
-  ADXL345_AC    = 0,
-  ADXL345_DC
+  ADXL345_DC    = 0b0,
+  ADXL345_AC    = 0b1
 } adxl_acdc;
 
 typedef enum {
@@ -102,16 +111,16 @@ typedef enum {
 } adxl_rate;
 
 typedef enum {
-  ADXL345_MODE_STANDBY = 0,
-  ADXL345_MODE_MEASURE
+  ADXL345_MODE_STANDBY = 0b0,
+  ADXL345_MODE_MEASURE = 0b1
 } adxl_mode;
 
 typedef enum {
-  ADXL345_SLEEP_OFF = 0b100,
-  ADXL345_SLEEP_RATE_1 = 0b011,
-  ADXL345_SLEEP_RATE_2 = 0b010,
-  ADXL345_SLEEP_RATE_4 = 0b001,
-  ADXL345_SLEEP_RATE_8 = 0b000,
+  ADXL345_SLEEP_OFF = 0b000,
+  ADXL345_SLEEP_RATE_1 = 0b111,
+  ADXL345_SLEEP_RATE_2 = 0b110,
+  ADXL345_SLEEP_RATE_4 = 0b101,
+  ADXL345_SLEEP_RATE_8 = 0b100,
 } adxl_sleep;
 
 typedef enum {
@@ -134,10 +143,38 @@ typedef enum {
 } adxl_pin_int;
 
 typedef struct {
-  u8_t fifo_trig : 1;
-  u8_t _rsv : 1;
-  u8_t entries : 6;
-} __attribute (( packed )) adxl_fifo_status;
+  union {
+    __attribute (( packed )) struct {
+      u8_t fifo_trig : 1;
+      u8_t _rsv : 1;
+      u8_t entries : 6;
+    };
+    u8_t raw;
+  };
+} adxl_fifo_status;
+
+typedef struct {
+  union {
+    __attribute (( packed )) struct {
+      u8_t _rsv : 1;
+      u8_t act_x : 1;
+      u8_t act_y : 1;
+      u8_t act_z : 1;
+      u8_t asleep : 1;
+      u8_t tap_x : 1;
+      u8_t tap_y : 1;
+      u8_t tap_z : 1;
+    };
+    u8_t raw;
+  };
+} adxl_act_tap_status;
+
+typedef struct {
+  u8_t int_src;
+  adxl_fifo_status fifo_status;
+  adxl_act_tap_status act_tap_status;
+} __attribute (( packed )) adxl_status;
+
 
 #define ADXL345_INT_DATA_READY    0b10000000
 #define ADXL345_INT_SINGLE_TAP    0b01000000
@@ -152,10 +189,14 @@ typedef struct adxl345_dev_s {
   i2c_dev i2c_dev;
   adxl_state state;
   void (* callback)(struct adxl345_dev_s *dev, adxl_state state, int res);
-  i2c_dev_sequence seq[3];
+  i2c_dev_sequence seq[6];
   union {
     bool *id_ok;
     adxl_reading *data;
+    adxl_fifo_status *fifo_status;
+    adxl_act_tap_status *act_tap_status;
+    adxl_status *status;
+    u8_t *int_src;
   } arg;
   u8_t tmp_buf[8];
 } adxl345_dev;
@@ -170,12 +211,11 @@ Configures power related configurations.
 @param low_power  A setting of 0 in the LOW_POWER bit selects normal operation,
                   and a setting of 1 selects reduced power operation, which has
                   somewhat higher noise.
-@param rate       These bits select the device bandwidth and output data rate (see
-                  Table 7 and Table 8 for details). The default value is 0x0A, which
-                  translates to a 100 Hz output data rate. An output data rate should
-                  be selected that is appropriate for the communication protocol
-                  and frequency selected. Selecting too high of an output data rate with
-                  a low communication speed results in samples being discarded.
+@param rate       These bits select the device bandwidth and output data rate. The default
+                  value is 0x0A, which translates to a 100 Hz output data rate. An output
+                  data rate should be selected that is appropriate for the communication
+                  protocol and frequency selected. Selecting too high of an output data
+                  rate with a low communication speed results in samples being discarded.
 @param link       A setting of 1 in the link bit with both the activity and inactivity
                   functions enabled delays the start of the activity function until
                   inactivity is detected. After activity is detected, inactivity detection
@@ -314,8 +354,8 @@ Configure activity/inactivity detection.
 @param time_inact  The TIME_INACT register is eight bits and contains an unsigned time value
                 representing the amount of time that acceleration must be less than the value
                 in the THRESH_INACT register for inactivity to be declared. The scale factor
-                is 1 sec/LSB. Unlike the other interrupt functions, which use unfiltered data
-                (see the Threshold section), the inactivity function uses filtered output data.
+                is 1 sec/LSB. Unlike the other interrupt functions, which use unfiltered data,
+                the inactivity function uses filtered output data.
                 At least one output sample must be generated for the inactivity interrupt to
                 be triggered. This results in the function appearing unresponsive if the
                 TIME_INACT register is set to a value less than the time constant of the output
@@ -342,8 +382,8 @@ Configure freefall detection.
                 behavior if the free-fall interrupt is enabled. Values between 100 ms
                 and 350 ms (0x14 to 0x46) are recommended.
  */
-
 int adxl_config_freefall(adxl345_dev *dev, u8_t thresh, u8_t time);
+
 /**
 Configure interrupts.
 @param dev      The adxl345 device struct.
@@ -356,8 +396,8 @@ Configure interrupts.
                 bits set to 1 send their respective interrupts to the INT2 pin. All
                 selected interrupts for a given pin are OR’ed.
  */
-
 int adxl_config_interrupts(adxl345_dev *dev, u8_t int_ena, u8_t int_map);
+
 /**
 Configure format.
 @param dev      The adxl345 device struct.
@@ -372,7 +412,6 @@ Configure format.
                 and a setting of 0 selects right-justified mode with sign extension.
 @param range    Sets the g range.
  */
-
 int adxl_config_format(adxl345_dev *dev,
     bool int_inv, bool full_res, bool justify, adxl_range range);
 
@@ -451,4 +490,30 @@ entry is available at the output filter of the device.
 @param int_src  Pointer to a fifo_status struct to be populated.
 */
 int adxl_read_fifo_status(adxl345_dev *dev, adxl_fifo_status *fifo_status);
+
+/**
+Read activity/tap/sleep status
+act_*  and tap_* bits indicate the first axis involved in a tap or activity
+event. A setting of 1 corresponds to involvement in the event,
+and a setting of 0 corresponds to no involvement. When new
+data is available, these bits are not cleared but are overwritten by
+the new data. The ACT_TAP_STATUS register should be read
+before clearing the interrupt. Disabling an axis from participation
+clears the corresponding source bit when the next activity or
+single tap/double tap event occurs.
+A setting of 1 in the asleep bit indicates that the part is asleep,
+and a setting of 0 indicates that the part is not asleep. This bit
+toggles only if the device is configured for auto sleep.
+@param dev             The adxl345 device struct.
+@param act_tap_status  Pointer to a act_tap_status struct to be populated.
+*/
+int adxl_read_act_tap_status(adxl345_dev *dev, adxl_act_tap_status *act_tap_status);
+
+/**
+Reads interrupt source, fifo status, and activity/tap status.
+@param dev             The adxl345 device struct.
+@param act_tap_status  Pointer to a status struct to be populated.
+*/
+int adxl_read_status(adxl345_dev *dev, adxl_status *status);
+
 #endif /* ADXL345_DRIVER_H_ */
