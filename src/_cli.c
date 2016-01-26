@@ -5,7 +5,8 @@
  *      Author: petera
  */
 
-#include "cli.h"
+#include "_cli.h"
+
 #include "uart_driver.h"
 #include "taskq.h"
 #include "miniutils.h"
@@ -79,6 +80,9 @@ static int f_hmc_drdy(void);
 
 static int f_adxl_open(void);
 static int f_adxl_check(void);
+static int f_adxl_cfg(void);
+static int f_adxl_read(void);
+static int f_adxl_stat(void);
 #endif
 
 static int f_ws_test(int seq);
@@ -148,8 +152,17 @@ static cmd c_tbl[] = {
     { .name = "adxl_open", .fn = (func) f_adxl_open,
         .help = "Open ADXL device\n"
     },
+    { .name = "adxl_cfg", .fn = (func) f_adxl_cfg,
+        .help = "Open ADXL device\n"
+    },
     { .name = "adxl_check", .fn = (func) f_adxl_check,
         .help = "Check ADXL ID\n"
+    },
+    { .name = "adxl_read", .fn = (func) f_adxl_read,
+        .help = "Read ADXL Data\n"
+    },
+    { .name = "adxl_sr", .fn = (func) f_adxl_stat,
+        .help = "Read ADXL status\n"
     },
 
 #endif
@@ -521,6 +534,9 @@ static int f_hmc_drdy(void) {
 
 static adxl345_dev adxl_dev;
 static bool adxl_bool;
+static adxl_reading adxl_data;
+static adxl_status adxl_sr;
+static volatile bool adxl_busy;
 
 static void adxl_cb(adxl345_dev *dev, adxl_state state, int res) {
   if (res < 0) print("adxl_cb err %i\n", res);
@@ -528,10 +544,63 @@ static void adxl_cb(adxl345_dev *dev, adxl_state state, int res) {
   case ADXL345_STATE_ID:
     print("adxl id ok: %s\n", adxl_bool ? "TRUE":"FALSE");
     break;
+  case ADXL345_STATE_READ:
+    print("adxl data: %04x %04x %04x\n", adxl_data.x, adxl_data.y, adxl_data.z);
+    break;
+  case ADXL345_STATE_READ_ALL_STATUS:
+    print("adxl state:\n"
+        "  int raw       : %08b\n"
+        "  int dataready : %i\n"
+        "  int activity  : %i\n"
+        "  int inactivity: %i\n"
+        "  int sgl tap   : %i\n"
+        "  int dbl tap   : %i\n"
+        "  int freefall  : %i\n"
+        "  int overrun   : %i\n"
+        "  int watermark : %i\n"
+        "  acttapsleep   : %08b\n"
+        "  act x y z     : %i %i %i\n"
+        "  tap x y z     : %i %i %i\n"
+        "  sleep         : %i\n"
+        "  fifo trigger  : %i\n"
+        "  entries       : %i\n"
+        ,
+        adxl_sr.int_src,
+        (adxl_sr.int_src & ADXL345_INT_DATA_READY) != 0,
+        (adxl_sr.int_src & ADXL345_INT_ACTIVITY) != 0,
+        (adxl_sr.int_src & ADXL345_INT_INACTIVITY) != 0,
+        (adxl_sr.int_src & ADXL345_INT_SINGLE_TAP) != 0,
+        (adxl_sr.int_src & ADXL345_INT_DOUBLE_TAP) != 0,
+        (adxl_sr.int_src & ADXL345_INT_FREE_FALL) != 0,
+        (adxl_sr.int_src & ADXL345_INT_OVERRUN) != 0,
+        (adxl_sr.int_src & ADXL345_INT_WATERMARK) != 0,
+        adxl_sr.act_tap_status,
+        adxl_sr.act_tap_status.act_x,
+        adxl_sr.act_tap_status.act_y,
+        adxl_sr.act_tap_status.act_z,
+        adxl_sr.act_tap_status.tap_x,
+        adxl_sr.act_tap_status.tap_y,
+        adxl_sr.act_tap_status.tap_z,
+        adxl_sr.act_tap_status.asleep,
+        adxl_sr.fifo_status.fifo_trig,
+        adxl_sr.fifo_status.entries
+
+        );
+    break;
+  case ADXL345_STATE_CONFIG_ACTIVITY:
+  case ADXL345_STATE_CONFIG_FIFO:
+  case ADXL345_STATE_CONFIG_FORMAT:
+  case ADXL345_STATE_CONFIG_FREEFALL:
+  case ADXL345_STATE_CONFIG_INTERRUPTS:
+  case ADXL345_STATE_CONFIG_POWER:
+  case ADXL345_STATE_CONFIG_TAP:
+    print("adxl cfg ok: %02x\n", state);
+    break;
   default:
     print("adxl_cb unknown state %02x\n", state);
     break;
   }
+  adxl_busy = FALSE;
 }
 
 static int f_adxl_open(void) {
@@ -540,6 +609,56 @@ static int f_adxl_open(void) {
 }
 static int f_adxl_check(void) {
   int res = adxl_check_id(&adxl_dev, &adxl_bool);
+  if (res != 0) print("err:%i\n", res);
+  return 0;
+}
+static int f_adxl_cfg(void) {
+  int res;
+
+  adxl_busy = TRUE;
+  res = adxl_config_power(&adxl_dev, FALSE, ADXL345_RATE_12_5_LP, TRUE, FALSE, ADXL345_MODE_MEASURE, ADXL345_SLEEP_OFF);
+  if (res != 0) {print("err:%i\n", res); return 0;}
+  while (adxl_busy);
+
+  adxl_busy = TRUE;
+  res = adxl_config_fifo(&adxl_dev, ADXL345_FIFO_BYPASS, ADXL345_PIN_INT1, 0);
+  if (res != 0) {print("err:%i\n", res); return 0;}
+  while (adxl_busy);
+
+  adxl_busy = TRUE;
+  res = adxl_config_format(&adxl_dev, FALSE, TRUE, FALSE, ADXL345_RANGE_2G);
+  if (res != 0) {print("err:%i\n", res); return 0;}
+  while (adxl_busy);
+
+  adxl_busy = TRUE;
+  res = adxl_config_freefall(&adxl_dev, 0, 0);
+  if (res != 0) {print("err:%i\n", res); return 0;}
+  while (adxl_busy);
+
+  adxl_busy = TRUE;
+  res = adxl_config_interrupts(&adxl_dev, ADXL345_INT_SINGLE_TAP | ADXL345_INT_INACTIVITY | ADXL345_INT_ACTIVITY, 0);
+  if (res != 0) {print("err:%i\n", res); return 0;}
+  while (adxl_busy);
+
+  adxl_busy = TRUE;
+  res = adxl_config_tap(&adxl_dev, ADXL345_XYZ, 0x40, 0x30, 0x40, 0xff , FALSE);
+  if (res != 0) {print("err:%i\n", res); return 0;}
+  while (adxl_busy);
+
+  adxl_busy = TRUE;
+  res = adxl_config_activity(&adxl_dev, ADXL345_AC, ADXL345_XYZ, ADXL345_XYZ, 12, 24, 5);
+  if (res != 0) {print("err:%i\n", res); return 0;}
+  while (adxl_busy);
+
+  return 0;
+}
+static int f_adxl_read(void) {
+  int res = adxl_read_data(&adxl_dev, &adxl_data);
+  if (res != 0) print("err:%i\n", res);
+  return 0;
+}
+static int f_adxl_stat(void) {
+  int res = adxl_read_status(&adxl_dev, &adxl_sr);
   if (res != 0) print("err:%i\n", res);
   return 0;
 }
@@ -791,7 +910,7 @@ void CLI_init() {
   DBG(D_CLI, D_DEBUG, "CLI init\n");
   UART_set_callback(_UART(UARTSTDIN), CLI_uart_check_char, NULL);
   print ("\n");
-  cli_print_app_name();
+  print(APP_NAME);
   print("\n\n");
   print("build     : %i\n", SYS_build_number());
   print("build date: %i\n", SYS_build_date());

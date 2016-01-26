@@ -5,24 +5,26 @@
 #include "timer.h"
 #include "miniutils.h"
 #include "taskq.h"
-#include "cli.h"
 #include "processor.h"
 #include "linker_symaccess.h"
 #include "app.h"
 #include "gpio.h"
+
 #ifdef CONFIG_SPI
 #include "spi_driver.h"
 #endif
 #ifdef CONFIG_I2C
 #include "i2c_driver.h"
 #endif
+#include "cli.h"
 
 static void app_assert_cb(void) {
   APP_shutdown();
 }
 
-// main entry from bootstrap
+DBG_ATTRIBUTE static u32_t __dbg_magic;
 
+// main entry from bootstrap
 int main(void) {
   enter_critical();
   PROC_base_init();
@@ -52,7 +54,19 @@ int main(void) {
 
   TASK_init();
 
-  CLI_init();
+  cli_init();
+
+  if (__dbg_magic != 0x43215678) {
+    __dbg_magic = 0x43215678;
+    SYS_dbg_level(D_WARN);
+    SYS_dbg_mask_set(0);
+  }
+  print ("\n");
+  print(APP_NAME);
+  print("\n\n");
+  print("build     : %i\n", SYS_build_number());
+  print("build date: %i\n", SYS_build_date());
+
 
   rand_seed(0xd0decaed ^ SYS_get_tick());
 

@@ -109,7 +109,6 @@ SFILES 		+= stm32f10x_it_h.s
 
 CFILES 		+= main.c
 CFILES 		+= processor.c
-CFILES 		+= cli.c
 CFILES 		+= timer.c
 CFILES		+= ws2812b_spi_stm32f1.c
 CFILES		+= hmc5883l_driver.c

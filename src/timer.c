@@ -10,7 +10,6 @@
 #include "stm32f10x.h"
 #include "miniutils.h"
 #include "uart_driver.h"
-#include "cli.h"
 #include "taskq.h"
 
 void TIMER_irq() {
@@ -22,6 +21,5 @@ void TIMER_irq() {
       TRACE_MS_TICK(SYS_get_time_ms() & 0xff);
     }
     TASK_timer();
-    CLI_timer();
   }
 }

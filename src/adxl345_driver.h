@@ -145,9 +145,9 @@ typedef enum {
 typedef struct {
   union {
     __attribute (( packed )) struct {
-      u8_t fifo_trig : 1;
-      u8_t _rsv : 1;
       u8_t entries : 6;
+      u8_t _rsv : 1;
+      u8_t fifo_trig : 1;
     };
     u8_t raw;
   };
@@ -156,14 +156,14 @@ typedef struct {
 typedef struct {
   union {
     __attribute (( packed )) struct {
-      u8_t _rsv : 1;
-      u8_t act_x : 1;
-      u8_t act_y : 1;
-      u8_t act_z : 1;
-      u8_t asleep : 1;
-      u8_t tap_x : 1;
-      u8_t tap_y : 1;
       u8_t tap_z : 1;
+      u8_t tap_y : 1;
+      u8_t tap_x : 1;
+      u8_t asleep : 1;
+      u8_t act_z : 1;
+      u8_t act_y : 1;
+      u8_t act_x : 1;
+      u8_t _rsv : 1;
     };
     u8_t raw;
   };

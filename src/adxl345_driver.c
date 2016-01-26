@@ -375,7 +375,7 @@ int adxl_read_status(adxl345_dev *dev, adxl_status *status) {
   I2C_SEQ_RX_STOP_C(dev->seq[3], &dev->tmp_buf[4], 1);
   I2C_SEQ_TX_C(dev->seq[4], &dev->tmp_buf[2], 1);
   I2C_SEQ_RX_STOP_C(dev->seq[5], &dev->tmp_buf[5], 1);
-  dev->state = ADXL345_STATE_READ_ACT_TAP;
+  dev->state = ADXL345_STATE_READ_ALL_STATUS;
   int res = I2C_DEV_sequence(&dev->i2c_dev, &dev->seq[0], 6);
   if (res != I2C_OK) {
     dev->state = ADXL345_STATE_IDLE;
