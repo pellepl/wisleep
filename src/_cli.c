@@ -173,9 +173,9 @@ static cmd c_tbl[] = {
 
     { .name = "dbg", .fn = (func) f_dbg,
         .help = "Set debug filter and level\n"
-        "dbg (level <dbg|info|warn|fatal>) (enable [x]*) (disable [x]*)\n"
-        "x - <task|heap|comm|cnc|cli|nvs|spi|all>\n"
-        "ex: dbg level info disable all enable cnc comm\n"
+        "dbg (level <dbg|info|warn|fatal>) (on [x]*) (off [x]*)\n"
+        "x - <task|heap|comm|app|cli|nvs|spi|all>\n"
+        "ex: dbg level info off all on app comm\n"
     },
     {.name = "memfind", .fn = (func) f_memfind,
         .help = "Searches for hex in memory\n"
