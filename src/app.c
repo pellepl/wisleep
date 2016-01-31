@@ -63,9 +63,11 @@ void APP_dump(void) {
 
 CLI_EXTERN_MENU(system)
 CLI_EXTERN_MENU(bus)
+CLI_EXTERN_MENU(dev)
 
 CLI_MENU_START_MAIN
 CLI_SUBMENU(system, "sys", "System submenu")
 CLI_SUBMENU(bus, "bus", "Processor busses submenu")
+CLI_SUBMENU(dev, "dev", "Peripheral devices submenu")
 CLI_FUNC("help", cli_help, "Prints help")
 CLI_MENU_END
