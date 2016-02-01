@@ -16,6 +16,10 @@
 #ifdef CONFIG_I2C
 #include "i2c_driver.h"
 #endif
+#ifdef CONFIG_WDOG
+#include "wdog.h"
+#endif
+
 #include "cli.h"
 
 static void app_assert_cb(void) {
@@ -44,6 +48,9 @@ int main(void) {
 
 #ifdef CONFIG_I2C
   I2C_init();
+#endif
+#ifdef CONFIG_WDOG
+  WDOG_init();
 #endif
 
   print("\n\n\nHardware initialization done\n");

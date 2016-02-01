@@ -13,10 +13,12 @@
 #include "gpio.h"
 #include "ws2812b_spi_stm32f1.h"
 #include "linker_symaccess.h"
+#include "wdog.h"
 #include <stdarg.h>
 
 static u8_t cli_buf[16];
 volatile bool cli_rd;
+static task_timer wdog_timer;
 
 static void cli_task_on_input(u32_t len, void *p) {
   u8_t io = (u8_t)((u32_t)p);
@@ -35,7 +37,15 @@ static void cli_rx_avail(u8_t io, void *arg, u16_t available) {
   }
 }
 
+static void wdog_feeder_f(u32_t ignore, void *ignore_more) {
+  WDOG_feed();
+}
+
 void APP_init(void) {
+  WDOG_start(11);
+  task *feeder = TASK_create(wdog_feeder_f, TASK_STATIC);
+  TASK_start_timer(feeder, &wdog_timer, 0, 0, 0, 10000, "wdog");
+
   gpio_enable(PIN_LED);
   WS2812B_STM32F1_init(NULL);
   cli_rd = FALSE;
