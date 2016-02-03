@@ -19,6 +19,9 @@
 #ifdef CONFIG_WDOG
 #include "wdog.h"
 #endif
+#ifdef CONFIG_RTC
+#include "rtc.h"
+#endif
 
 #include "cli.h"
 
@@ -45,12 +48,14 @@ int main(void) {
 #ifdef CONFIG_SPI
   SPI_init();
 #endif
-
 #ifdef CONFIG_I2C
   I2C_init();
 #endif
 #ifdef CONFIG_WDOG
   WDOG_init();
+#endif
+#ifdef CONFIG_RTC
+  RTC_init(NULL);
 #endif
 
   print("\n\n\nHardware initialization done\n");

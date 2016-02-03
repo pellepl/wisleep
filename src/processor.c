@@ -106,6 +106,11 @@ static void NVIC_config(void)
   NVIC_EnableIRQ(I2C2_ER_IRQn);
 #endif
 
+#ifdef CONFIG_RTC
+  NVIC_SetPriority(RTCAlarm_IRQn, NVIC_EncodePriority(prioGrp, 1, 0));
+  NVIC_EnableIRQ(RTCAlarm_IRQn);
+#endif
+
   // WS2812B driver
   NVIC_SetPriority(DMA1_Channel5_IRQn, NVIC_EncodePriority(prioGrp, 3, 1));
   NVIC_EnableIRQ(DMA1_Channel5_IRQn);

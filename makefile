@@ -27,11 +27,13 @@ STARTUP = startup_stm32f10x_md.s
 sourcedir = src
 builddir = build
 
-basetoolsdir = /home/petera/toolchain/arm-elf-tools-fp-4.8.2
+basetoolsdir = /home/petera/toolchain/arm-none-eabi-toolchain-gcc-5.3.0-softfloat
+#basetoolsdir = /home/petera/toolchain/arm-elf-tools-fp-4.8.2
 #basetoolsdir = /home/petera/toolchain/gcc/arm-elf-tools-4.8.1
 #basetoolsdir = /home/petera/toolchain/gcc/arm-elf-tools-4.7.1
 #basetoolsdir = /usr/local/gcc/arm-elf-tools-4.8.2
 #codir = ${basetoolsdir}/lib/gcc/arm-none-eabi/4.8.1/
+libdir = ${basetoolsdir}/lib/gcc/arm-none-eabi/5.3.0
 
 hfile = ${sourcedir}/config_header.h
 
@@ -154,7 +156,7 @@ CFILES	+= core_cm3.c
 # stm32 system
 CFILES 	+= stm32f10x_it.c
 
-LIBS = 
+LIBS = ${libdir}/libgcc.a
 
 BINARYEXT = .hex
 
