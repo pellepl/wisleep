@@ -184,6 +184,7 @@ typedef u16_t system_counter_type;
 //#define DBG_OFF
 
 #define CONFIG_DEFAULT_DEBUG_MASK     (0xffffffff)
+#define DBG_MS_PREFIX          1
 
 // enable or disable tracing
 #define DBG_TRACE_MON

@@ -88,7 +88,19 @@ int main(void) {
 
   while (1) {
     while (TASK_tick());
-    TASK_wait();
+    time t;
+    s32_t err = TASK_next_wakeup_ms(&t);
+    if (!err) {
+      print("wait until 0x%08x%08x\n", (u32_t)(t>>32), (u32_t)t);
+      RTC_set_alarm_tick(RTC_MS_TO_TICK(t));
+      SYS_hardsleep_ms(t - RTC_TICK_TO_MS(RTC_get_tick()));
+      t = RTC_TICK_TO_MS(RTC_get_tick());
+      print("  awaken @ 0x%08x%08x\n", (u32_t)(t>>32), (u32_t)t);
+      TASK_timer();
+    } else {
+      // wait indefinitely
+      TASK_wait();
+    }
   }
 
   return 0;

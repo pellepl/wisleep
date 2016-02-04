@@ -278,7 +278,7 @@ static void SPI_config() {
 void PROC_base_init() {
   RCC_config();
   NVIC_config();
-  TIM_config();
+  //TIM_config();
 }
 
 void PROC_periph_init() {
