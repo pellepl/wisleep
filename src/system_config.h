@@ -15,8 +15,6 @@
 
 #define APP_NAME "WISLEEP"
 
-#define WS2812B_NBR_OF_LEDS 16
-
 /****************************************/
 /***** Functionality block settings *****/
 /****************************************/
@@ -173,7 +171,7 @@ typedef u16_t system_counter_type;
 
 /** APP **/
 
-#define CONFIG_TRANSDUCER_FREQ (40000)
+#define WS2812B_NBR_OF_LEDS 16
 
 /** DEBUG **/
 

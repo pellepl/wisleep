@@ -107,8 +107,6 @@ include ${CONFIG_MAKE}
 
 # common  files
 
-SFILES 		+= stm32f10x_it_h.s
-
 CFILES 		+= main.c
 CFILES 		+= processor.c
 CFILES 		+= timer.c
@@ -117,7 +115,7 @@ CFILES		+= ws2812b_spi_stm32f1.c
 CFILES		+= app.c
 
 # stm32 lib files
-SPATH	+= ${stmdriverdir}/src ${stmcmsisdir} ${stmcmsisdir}/startup/gcc_ride7
+#SPATH	+= ${stmdriverdir}/src ${stmcmsisdir} ${stmcmsisdir}/startup/gcc_ride7
 SFILES 	+= $(STARTUP)
 
 CPATH	+= ${stmdriverdir}/src ${stmcmsisdir} ${stmcmsisdircore}
