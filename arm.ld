@@ -15,12 +15,13 @@ RAM_SIZE    = LENGTH(RAM);
 
 /* Shared memory size */
 _Shared_Memory_Size = 128;
+_Debug_Memory_Size = 16;
 
 /* Generate a link error if stack don't fit into RAM */
 _Min_Stack_Size = 0x2000; /* required amount of stack */
 
 /* Highest address of the user mode stack */
-_estack = RAM_START + RAM_SIZE - _Shared_Memory_Size;
+_estack = RAM_START + RAM_SIZE - _Shared_Memory_Size - _Debug_Memory_Size;
 
 /* Define output sections */
 SECTIONS
@@ -173,6 +174,13 @@ SECTIONS
     . = ALIGN(4);
   __stack_end__ = _estack;
 
+  /* Debug area, not wiped at reset */	
+  .dbg (RAM_START + RAM_SIZE - _Shared_Memory_Size - _Debug_Memory_Size): {
+    *(.dbg)
+    *(.dbg.*)
+    . = ALIGN(4);
+  } >RAM
+	
   /* Shared memory area, not wiped at reset */	
   .shmem (RAM_START + RAM_SIZE - _Shared_Memory_Size): {
     __shared_memory_address__ = .;         /* define a global symbol at shared memory start */
