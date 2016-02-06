@@ -17,13 +17,32 @@
 #include "rtc.h"
 #include <stdarg.h>
 
+static volatile u8_t cpu_claims;
 static u8_t cli_buf[16];
 volatile bool cli_rd;
 static task_timer heartbeat_timer;
+static task *cli_tmo_task;
+static task_timer cli_tmo_timer;
+static bool was_uart_connected = FALSE;
+static u64_t cli_tmo_last_time = 0;
+static bool cli_claimed = FALSE;
+
+static void app_cli_claim(void) {
+  APP_claim(CLAIM_CLI);
+  cli_claimed = TRUE;
+  TASK_start_timer(cli_tmo_task, &cli_tmo_timer, 0, 0, 0, 1000, "cli");
+  cli_tmo_last_time = RTC_get_tick();
+}
+
+static void app_cli_release(void) {
+  APP_release(CLAIM_CLI);
+  TASK_stop_timer(&cli_tmo_timer);
+  cli_claimed = FALSE;
+}
 
 static bool detect_uart(void) {
   gpio_config(PORTA, PIN3, CLK_50MHZ, IN, AF0, OPENDRAIN, PULLDOWN);
-  SYS_hardsleep_ms(1); // wait for pin to stabilize
+  SYS_hardsleep_ms(2); // wait for pin to stabilize
   int i;
   for (i = 0; i < 3; i++) {
     if (gpio_get(PORTA, PIN3)) return TRUE;
@@ -41,6 +60,16 @@ static void cli_task_on_input(u32_t len, void *p) {
     cli_recv((char *)cli_buf, rlen);
   }
   cli_rd = FALSE;
+  cli_tmo_last_time = RTC_get_tick();
+}
+
+static void cli_tmo(u32_t a, void *p) {
+  if (cli_claimed) {
+    u64_t tick_now = RTC_get_tick();
+    if (tick_now - cli_tmo_last_time > RTC_S_TO_TICK(30)) {
+      app_cli_release();
+    }
+  }
 }
 
 static void cli_rx_avail(u8_t io, void *arg, u16_t available) {
@@ -51,14 +80,14 @@ static void cli_rx_avail(u8_t io, void *arg, u16_t available) {
   }
 }
 
-static bool was_uart_connected = FALSE;
 static void heartbeat(u32_t ignore, void *ignore_more) {
   gpio_disable(PIN_LED);
 
   WDOG_feed();
   bool is_uart_connected = detect_uart();
-  if (is_uart_connected && !was_uart_connected) {
-
+  if (is_uart_connected && !was_uart_connected && !cli_claimed) {
+    DBG(D_SYS, D_DEBUG, "UART reconnected\n");
+    app_cli_claim();
   }
   was_uart_connected = is_uart_connected;
   gpio_enable(PIN_LED);
@@ -96,7 +125,7 @@ static void app_spin(void) {
     rtc_datetime dt;
     RTC_get_date_time(&dt);
     u64_t curtick = RTC_get_tick();
-    print("%04i-%02i-%02i %02i:%02i:%02i.%03i %08x %08x\n",
+    DBG(D_SYS, D_INFO, "%04i-%02i-%02i %02i:%02i:%02i.%03i %08x %08x\n",
         dt.date.year,
         dt.date.month + 1,
         dt.date.month_day,
@@ -130,49 +159,50 @@ static void app_spin(void) {
       RCC_ClearFlag();
 
       // wake us at timer value
-      RTC_set_alarm_tick(RTC_MS_TO_TICK(wakeup_ms));
-      print("..prepare for STOP for %i ms\n", (u32_t)(wakeup_ms - RTC_TICK_TO_MS(RTC_get_tick())));
-      irq_disable();
-      IO_tx_flush(IOSTD);
-      irq_enable();
+      u64_t wu_tick = RTC_MS_TO_TICK(wakeup_ms);
+      RTC_set_alarm_tick(wu_tick);
 
-      // sleep
-      PWR_EnterSTOPMode(PWR_Regulator_ON, PWR_STOPEntry_WFI);
+      if (cpu_claims) {
+        DBG(D_SYS, D_DEBUG, "..snoozing for %i ms, %i resources claimed\n", (u32_t)(wakeup_ms - RTC_TICK_TO_MS(RTC_get_tick())), cpu_claims);
+        while (!TASK_tick() && RTC_get_tick() < wu_tick)
+          __WFI();
+      } else {
+        // no one holding any resource, sleep
+        DBG(D_SYS, D_DEBUG, "..sleeping for %i ms\n", (u32_t)(wakeup_ms - RTC_TICK_TO_MS(RTC_get_tick())));
+        irq_disable();
+        IO_tx_flush(IOSTD);
+        irq_enable();
 
-      // wake, reconfigure
-      SYSCLKConfig_Stop();
+        // sleep
+        PWR_EnterSTOPMode(PWR_Regulator_ON, PWR_STOPEntry_WFI);
 
-      print("\n");
+        // wake, reconfigure
+        SYSCLKConfig_Stop();
 
-      if (PWR_GetFlagStatus(PWR_FLAG_WU) == SET) {
-        PWR_ClearFlag(PWR_FLAG_WU);
-        print("PWR_FLAG_WU\n");
+        print("\n");
+
+        if (PWR_GetFlagStatus(PWR_FLAG_WU) == SET) {
+          PWR_ClearFlag(PWR_FLAG_WU);
+          print("PWR_FLAG_WU\n");
+        }
+        if (PWR_GetFlagStatus(PWR_FLAG_SB) == SET) {
+          PWR_ClearFlag(PWR_FLAG_SB);
+          print("PWR_FLAG_SB\n");
+        }
+        if (PWR_GetFlagStatus(PWR_FLAG_PVDO) == SET) {
+          PWR_ClearFlag(PWR_FLAG_PVDO);
+          print("PWR_FLAG_PVDO\n");
+        }
+        if (RCC_GetFlagStatus(RCC_FLAG_PINRST) == SET) print("PIN\n");
+        if (RCC_GetFlagStatus(RCC_FLAG_IWDGRST) == SET) print("IWDG\n");
+        if (RCC_GetFlagStatus(RCC_FLAG_LPWRRST) == SET) print("LPWR\n");
+        if (RCC_GetFlagStatus(RCC_FLAG_PORRST) == SET) print("POR\n");
+        if (RCC_GetFlagStatus(RCC_FLAG_SFTRST) == SET) print("SFT\n");
+        if (RCC_GetFlagStatus(RCC_FLAG_WWDGRST) == SET) print("WWDG\n");
+        RCC_ClearFlag();
+
+        DBG(D_SYS, D_DEBUG, "awaken from sleep\n");
       }
-      if (PWR_GetFlagStatus(PWR_FLAG_SB) == SET) {
-        PWR_ClearFlag(PWR_FLAG_SB);
-        print("PWR_FLAG_SB\n");
-      }
-      if (PWR_GetFlagStatus(PWR_FLAG_PVDO) == SET) {
-        PWR_ClearFlag(PWR_FLAG_PVDO);
-        print("PWR_FLAG_PVDO\n");
-      }
-      if (RCC_GetFlagStatus(RCC_FLAG_PINRST) == SET) print("PIN\n");
-      if (RCC_GetFlagStatus(RCC_FLAG_IWDGRST) == SET) print("IWDG\n");
-      if (RCC_GetFlagStatus(RCC_FLAG_LPWRRST) == SET) print("LPWR\n");
-      if (RCC_GetFlagStatus(RCC_FLAG_PORRST) == SET) print("POR\n");
-      if (RCC_GetFlagStatus(RCC_FLAG_SFTRST) == SET) print("SFT\n");
-      if (RCC_GetFlagStatus(RCC_FLAG_WWDGRST) == SET) print("WWDG\n");
-      RCC_ClearFlag();
-
-      print("awaken from STOP\n");
-
-      irq_disable();
-      IO_tx_flush(IOSTD);
-      irq_enable();
-
-      //while (!TASK_tick() && RTC_TICK_TO_MS(RTC_get_tick()) < t)
-      //  __WFI();
-
       TASK_timer();
     }
   }
@@ -180,10 +210,21 @@ static void app_spin(void) {
 
 void APP_init(void) {
   WDOG_start(11);
+
+  gpio_enable(PIN_LED);
+
+  cpu_claims = 0;
+
   task *heatbeat_task = TASK_create(heartbeat, TASK_STATIC);
   TASK_start_timer(heatbeat_task, &heartbeat_timer, 0, 0, 0, 10000, "heartbeat");
 
-  gpio_enable(PIN_LED);
+  cli_tmo_task = TASK_create(cli_tmo, TASK_STATIC);
+  if (detect_uart()) {
+    app_cli_claim();
+  } else {
+    cli_tmo_last_time = 0;
+  }
+
   WS2812B_STM32F1_init(NULL);
   cli_rd = FALSE;
   IO_set_callback(IOSTD, cli_rx_avail, NULL);
@@ -197,6 +238,22 @@ void APP_shutdown(void) {
 void APP_dump(void) {
   print("APP specifics\n-------------\n");
   print("\n");
+}
+
+void APP_claim(u8_t resource) {
+  (void)resource;
+  irq_disable();
+  ASSERT(cpu_claims < 0xff);
+  cpu_claims++;
+  irq_enable();
+}
+
+void APP_release(u8_t resource) {
+  (void)resource;
+  irq_disable();
+  ASSERT(cpu_claims > 0);
+  cpu_claims--;
+  irq_enable();
 }
 
 

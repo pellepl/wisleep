@@ -16,9 +16,14 @@
 #define PIN_UART_RX           PORTA, PIN3
 #define PIN_LED               PORTC, PIN13
 
+#define CLAIM_CLI             0x00
+
 // initializes application
 void APP_init(void);
 
 void APP_shutdown(void);
+
+void APP_claim(u8_t resource);
+void APP_release(u8_t resource);
 
 #endif /* APP_H_ */
