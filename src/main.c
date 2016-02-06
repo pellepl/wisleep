@@ -53,7 +53,18 @@ int main(void) {
   WDOG_init();
 #endif
 #ifdef CONFIG_RTC
-  RTC_init(NULL); // TODO
+  if (RTC_init(NULL)) { // TODO
+    rtc_datetime dt = {
+        .date.year = 2016,
+        .date.month = 0,
+        .date.month_day = 1,
+        .time.hour = 12,
+        .time.minute = 0,
+        .time.second = 0,
+        .time.millisecond = 0
+    };
+    RTC_set_date_time(&dt);
+  }
 #endif
 
   print("\n\n\nHardware initialization done\n");

@@ -19,20 +19,19 @@
 
 static u8_t cli_buf[16];
 volatile bool cli_rd;
-static task_timer wdog_timer;
+static task_timer heartbeat_timer;
 
 static bool detect_uart(void) {
   gpio_config(PORTA, PIN3, CLK_50MHZ, IN, AF0, OPENDRAIN, PULLDOWN);
-  SYS_hardsleep_ms(2); // wait for pin to stabilize
+  SYS_hardsleep_ms(1); // wait for pin to stabilize
   int i;
-  u8_t r = 0;
   for (i = 0; i < 3; i++) {
-    r += gpio_get(PORTA, PIN3);
+    if (gpio_get(PORTA, PIN3)) return TRUE;
     SYS_hardsleep_ms(1);
   }
   // reset to uart config
   gpio_config(PORTA, PIN3, CLK_50MHZ, IN, AF0, OPENDRAIN, NOPULL);
-  return r != 0;
+  return FALSE;
 }
 
 static void cli_task_on_input(u32_t len, void *p) {
@@ -52,8 +51,18 @@ static void cli_rx_avail(u8_t io, void *arg, u16_t available) {
   }
 }
 
-static void wdog_feeder_f(u32_t ignore, void *ignore_more) {
+static bool was_uart_connected = FALSE;
+static void heartbeat(u32_t ignore, void *ignore_more) {
+  gpio_disable(PIN_LED);
+
   WDOG_feed();
+  bool is_uart_connected = detect_uart();
+  if (is_uart_connected && !was_uart_connected) {
+
+  }
+  was_uart_connected = is_uart_connected;
+  gpio_enable(PIN_LED);
+
 }
 
 static void SYSCLKConfig_Stop(void)
@@ -171,24 +180,13 @@ static void app_spin(void) {
 
 void APP_init(void) {
   WDOG_start(11);
-  task *feeder = TASK_create(wdog_feeder_f, TASK_STATIC);
-  TASK_start_timer(feeder, &wdog_timer, 0, 0, 0, 10000, "wdog");
+  task *heatbeat_task = TASK_create(heartbeat, TASK_STATIC);
+  TASK_start_timer(heatbeat_task, &heartbeat_timer, 0, 0, 0, 10000, "heartbeat");
 
   gpio_enable(PIN_LED);
   WS2812B_STM32F1_init(NULL);
   cli_rd = FALSE;
   IO_set_callback(IOSTD, cli_rx_avail, NULL);
-
-  rtc_datetime dt = {
-      .date.year = 2000,
-      .date.month = 0,
-      .date.month_day = 1,
-      .time.hour = 12,
-      .time.minute = 0,
-      .time.second = 0,
-      .time.millisecond = 0
-  };
-  RTC_set_date_time(&dt);
 
   app_spin();
 }
