@@ -94,37 +94,31 @@ static void heartbeat(u32_t ignore, void *ignore_more) {
 
 }
 
-static void SYSCLKConfig_Stop(void)
+static void sleep_stop_restore(void)
 {
-  /* Enable HSE */
+  // Enable HSE
   RCC_HSEConfig(RCC_HSE_ON);
 
-  /* Wait till HSE is ready */
+  // Wait till HSE is ready
   ErrorStatus HSEStartUpStatus;
   HSEStartUpStatus = RCC_WaitForHSEStartUp();
   ASSERT(HSEStartUpStatus == SUCCESS);
-  /* Enable PLL */
+  // Enable PLL
   RCC_PLLCmd(ENABLE);
 
-  /* Wait till PLL is ready */
-  while(RCC_GetFlagStatus(RCC_FLAG_PLLRDY) == RESET)
-  {
-  }
-
-  /* Select PLL as system clock source */
+  // Wait till PLL is ready
+  while(RCC_GetFlagStatus(RCC_FLAG_PLLRDY) == RESET);
+  // Select PLL as system clock source
   RCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);
-
-  /* Wait till PLL is used as system clock source */
-  while(RCC_GetSYSCLKSource() != 0x08)
-  {
-  }
+  // Wait till PLL is used as system clock source
+  while(RCC_GetSYSCLKSource() != 0x08);
 }
 
 static void app_spin(void) {
   while (1) {
     rtc_datetime dt;
     RTC_get_date_time(&dt);
-    u64_t curtick = RTC_get_tick();
+    u64_t cur_tick = RTC_get_tick();
     DBG(D_SYS, D_INFO, "%04i-%02i-%02i %02i:%02i:%02i.%03i %08x %08x\n",
         dt.date.year,
         dt.date.month + 1,
@@ -133,7 +127,7 @@ static void app_spin(void) {
         dt.time.minute,
         dt.time.second,
         dt.time.millisecond,
-        (u32_t)((curtick)>>32), (u32_t)(curtick)
+        (u32_t)((cur_tick)>>32), (u32_t)(cur_tick)
         );
 
     // execute all pending tasks
@@ -142,74 +136,83 @@ static void app_spin(void) {
     // get nearest timer
     time wakeup_ms;
     s32_t no_wakeup = TASK_next_wakeup_ms(&wakeup_ms);
-    if (no_wakeup) {
-      // no timer, wait indefinitely
-      TASK_wait();
-    } else {
-      s64_t diff = wakeup_ms - RTC_TICK_TO_MS(RTC_get_tick());
+    s64_t diff = 0;
+    if (!no_wakeup) {
+      diff = wakeup_ms - RTC_TICK_TO_MS(cur_tick);
+      ASSERT(diff < RTC_TICK_TO_MS(0x100000000LL));
       if (diff <= 0) {
         // got at least one timer that already should've triggered: fire and loop
         TASK_timer();
         continue;
       }
+    }
+
+    u64_t wu_tick = (u64_t)(-1ULL);
+    if (no_wakeup) {
+      // wait forever
+      RTC_cancel_alarm();
+    } else {
+      // wake us at timer value
+      wu_tick = RTC_MS_TO_TICK(wakeup_ms);
+      RTC_set_alarm_tick(wu_tick);
+    }
+
+    if (cpu_claims || (!no_wakeup && diff < PREVENT_SLEEP_IF_LESS_MS)) {
+      DBG(D_SYS, D_DEBUG, "..snoozing for %i ms, %i resources claimed\n", (u32_t)(wakeup_ms - RTC_TICK_TO_MS(RTC_get_tick())), cpu_claims);
+      while (cpu_claims && !TASK_tick() && RTC_get_tick() <= wu_tick)
+        __WFI();
+    } else {
+      // no one holding any resource, sleep
+      DBG(D_SYS, D_DEBUG, "..sleeping for %i ms\n", (u32_t)(wakeup_ms - RTC_TICK_TO_MS(RTC_get_tick())));
+      irq_disable();
+      IO_tx_flush(IOSTD);
+      irq_enable();
 
       PWR_ClearFlag(PWR_FLAG_PVDO);
       PWR_ClearFlag(PWR_FLAG_WU);
       PWR_ClearFlag(PWR_FLAG_SB);
-      RCC_ClearFlag();
 
-      // wake us at timer value
-      u64_t wu_tick = RTC_MS_TO_TICK(wakeup_ms);
-      RTC_set_alarm_tick(wu_tick);
+      EXTI_ClearITPendingBit(EXTI_Line17);
+      RTC_ClearITPendingBit(RTC_IT_ALR);
+      RTC_WaitForLastTask();
 
-      if (cpu_claims) {
-        DBG(D_SYS, D_DEBUG, "..snoozing for %i ms, %i resources claimed\n", (u32_t)(wakeup_ms - RTC_TICK_TO_MS(RTC_get_tick())), cpu_claims);
-        while (!TASK_tick() && RTC_get_tick() < wu_tick)
-          __WFI();
-      } else {
-        // no one holding any resource, sleep
-        DBG(D_SYS, D_DEBUG, "..sleeping for %i ms\n", (u32_t)(wakeup_ms - RTC_TICK_TO_MS(RTC_get_tick())));
-        irq_disable();
-        IO_tx_flush(IOSTD);
-        irq_enable();
+      // sleep
+      PWR_EnterSTOPMode(PWR_Regulator_ON, PWR_STOPEntry_WFI);
 
-        // sleep
-        PWR_EnterSTOPMode(PWR_Regulator_ON, PWR_STOPEntry_WFI);
+      // wake, reconfigure
+      sleep_stop_restore();
 
-        // wake, reconfigure
-        SYSCLKConfig_Stop();
-
-        print("\n");
-
-        if (PWR_GetFlagStatus(PWR_FLAG_WU) == SET) {
-          PWR_ClearFlag(PWR_FLAG_WU);
-          print("PWR_FLAG_WU\n");
-        }
-        if (PWR_GetFlagStatus(PWR_FLAG_SB) == SET) {
-          PWR_ClearFlag(PWR_FLAG_SB);
-          print("PWR_FLAG_SB\n");
-        }
-        if (PWR_GetFlagStatus(PWR_FLAG_PVDO) == SET) {
-          PWR_ClearFlag(PWR_FLAG_PVDO);
-          print("PWR_FLAG_PVDO\n");
-        }
-        if (RCC_GetFlagStatus(RCC_FLAG_PINRST) == SET) print("PIN\n");
-        if (RCC_GetFlagStatus(RCC_FLAG_IWDGRST) == SET) print("IWDG\n");
-        if (RCC_GetFlagStatus(RCC_FLAG_LPWRRST) == SET) print("LPWR\n");
-        if (RCC_GetFlagStatus(RCC_FLAG_PORRST) == SET) print("POR\n");
-        if (RCC_GetFlagStatus(RCC_FLAG_SFTRST) == SET) print("SFT\n");
-        if (RCC_GetFlagStatus(RCC_FLAG_WWDGRST) == SET) print("WWDG\n");
-        RCC_ClearFlag();
-
-        DBG(D_SYS, D_DEBUG, "awaken from sleep\n");
-      }
-      TASK_timer();
+      DBG(D_SYS, D_DEBUG, "awaken from sleep\n");
     }
-  }
+
+    // check if any timers fired and insert them into task queue
+    TASK_timer();
+  } // while forever
 }
 
 void APP_init(void) {
-  WDOG_start(11);
+  WDOG_start(20);
+
+  if (PWR_GetFlagStatus(PWR_FLAG_WU) == SET) {
+    PWR_ClearFlag(PWR_FLAG_WU);
+    print("PWR_FLAG_WU\n");
+  }
+  if (PWR_GetFlagStatus(PWR_FLAG_SB) == SET) {
+    PWR_ClearFlag(PWR_FLAG_SB);
+    print("PWR_FLAG_SB\n");
+  }
+  if (PWR_GetFlagStatus(PWR_FLAG_PVDO) == SET) {
+    PWR_ClearFlag(PWR_FLAG_PVDO);
+    print("PWR_FLAG_PVDO\n");
+  }
+  if (RCC_GetFlagStatus(RCC_FLAG_SFTRST) == SET) print("SFT\n");
+  if (RCC_GetFlagStatus(RCC_FLAG_PORRST) == SET) print("POR\n");
+  if (RCC_GetFlagStatus(RCC_FLAG_PINRST) == SET) print("PIN\n");
+  if (RCC_GetFlagStatus(RCC_FLAG_IWDGRST) == SET) print("IWDG\n");
+  if (RCC_GetFlagStatus(RCC_FLAG_LPWRRST) == SET) print("LPWR\n");
+  if (RCC_GetFlagStatus(RCC_FLAG_WWDGRST) == SET) print("WWDG\n");
+  RCC_ClearFlag();
+
 
   gpio_enable(PIN_LED);
 

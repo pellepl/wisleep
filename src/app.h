@@ -16,6 +16,8 @@
 #define PIN_UART_RX           PORTA, PIN3
 #define PIN_LED               PORTC, PIN13
 
+#define PREVENT_SLEEP_IF_LESS_MS    20
+
 #define CLAIM_CLI             0x00
 
 // initializes application
