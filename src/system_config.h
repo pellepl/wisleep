@@ -137,13 +137,25 @@
 // STM32 system timer
 #define CONFIG_STM32_SYSTEM_TIMER   2
 // system timer frequency
-#define SYS_MAIN_TIMER_FREQ   2000
+#define SYS_MAIN_TIMER_FREQ   40000
 // system timer counter type
 typedef u16_t system_counter_type;
 // system tick frequency
 #define SYS_TIMER_TICK_FREQ   1000
 // os ticker cpu clock div
 #define SYS_OS_TICK_DIV       8
+
+/** ARCH **/
+
+#define CONFIG_ARCH_CRITICAL_DISABLE_IRQ \
+  do { \
+    __set_BASEPRI(0x02<<(8-__NVIC_PRIO_BITS)); \
+  } while (0)
+
+#define CONFIG_ARCH_CRITICAL_ENABLE_IRQ \
+  do { \
+    __set_BASEPRI(0x00); \
+} while (0)
 
 /** UART **/
 
@@ -161,9 +173,11 @@ typedef u16_t system_counter_type;
 #define IODBG        IOSTD
 
 /** MATH **/
+
 #define CONFIG_TRIGQ_TABLE
 
 /** TASK KERNEL **/
+
 #define CONFIG_TASK_POOL 32
 //#define CONFIG_TASK_NONCRITICAL_TIMER
 //#define CONFIG_TASKQ_DBG_CRITICAL
@@ -172,6 +186,9 @@ typedef u16_t system_counter_type;
 /** APP **/
 
 #define WS2812B_NBR_OF_LEDS 16
+#define CONFIG_RTC_CLOCK_HZ 32768
+#define CONFIG_RTC_PRESCALER 16
+
 
 /** DEBUG **/
 

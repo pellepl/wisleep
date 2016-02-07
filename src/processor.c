@@ -73,28 +73,21 @@ static void NVIC_config(void)
   NVIC_SetPriorityGrouping(prioGrp);
 
 
-  // Config systick interrupt
-  NVIC_SetPriority(SysTick_IRQn, NVIC_EncodePriority(prioGrp, 1, 1));
-
   // Config pendsv interrupt, lowest
   NVIC_SetPriority(PendSV_IRQn, NVIC_EncodePriority(prioGrp, 7, 1));
 
-  // Config & enable TIM interrupt
-  NVIC_SetPriority(STM32_SYSTEM_TIMER_IRQn, NVIC_EncodePriority(prioGrp, 1, 0));
-  NVIC_EnableIRQ(STM32_SYSTEM_TIMER_IRQn);
-
   // Config & enable uarts interrupt
 #ifdef CONFIG_UART2
-  NVIC_SetPriority(USART2_IRQn, NVIC_EncodePriority(prioGrp, 2, 0));
+  NVIC_SetPriority(USART2_IRQn, NVIC_EncodePriority(prioGrp, 7, 0));
   NVIC_EnableIRQ(USART2_IRQn);
 #endif
 
 #ifdef CONFIG_SPI
   // Config & enable the SPI-DMA interrupt
 #ifdef CONFIG_SPI1
-  NVIC_SetPriority(SPI1_MASTER_Rx_IRQ_Channel, NVIC_EncodePriority(prioGrp, 3, 0));
+  NVIC_SetPriority(SPI1_MASTER_Rx_IRQ_Channel, NVIC_EncodePriority(prioGrp, 7, 0));
   NVIC_EnableIRQ(SPI1_MASTER_Rx_IRQ_Channel);
-  NVIC_SetPriority(SPI1_MASTER_Tx_IRQ_Channel, NVIC_EncodePriority(prioGrp, 3, 1));
+  NVIC_SetPriority(SPI1_MASTER_Tx_IRQ_Channel, NVIC_EncodePriority(prioGrp, 7, 1));
   NVIC_EnableIRQ(SPI1_MASTER_Tx_IRQ_Channel);
 #endif
 #endif
@@ -107,12 +100,12 @@ static void NVIC_config(void)
 #endif
 
 #ifdef CONFIG_RTC
-  NVIC_SetPriority(RTCAlarm_IRQn, NVIC_EncodePriority(prioGrp, 1, 0));
+  NVIC_SetPriority(RTCAlarm_IRQn, NVIC_EncodePriority(prioGrp, 0, 0));
   NVIC_EnableIRQ(RTCAlarm_IRQn);
 #endif
 
   // WS2812B driver
-  NVIC_SetPriority(DMA1_Channel5_IRQn, NVIC_EncodePriority(prioGrp, 3, 1));
+  NVIC_SetPriority(DMA1_Channel5_IRQn, NVIC_EncodePriority(prioGrp, 5, 0));
   NVIC_EnableIRQ(DMA1_Channel5_IRQn);
 }
 

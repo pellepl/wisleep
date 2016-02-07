@@ -16,13 +16,17 @@
 #define PIN_UART_RX           PORTA, PIN3
 #define PIN_LED               PORTC, PIN13
 
+#define APP_PREVENT_SLEEP_IF_LESS_MS    20
+#define APP_WDOG_TIMEOUT_S              23
+#define APP_HEARTBEAT_MS                20000
+#define APP_CLI_POLL_MS                 1000
+#define APP_CLI_INACT_SHUTDOWN_S        30
+
 #define CLAIM_CLI             0x00
 
 // initializes application
 void APP_init(void);
-
 void APP_shutdown(void);
-
 void APP_claim(u8_t resource);
 void APP_release(u8_t resource);
 
