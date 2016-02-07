@@ -173,9 +173,8 @@ static void app_spin(void) {
       // resources held or too soon to wake up to go deep-sleep
       DBG(D_SYS, D_DEBUG, "..snoozing for %i ms, %i resources claimed\n", (u32_t)(wakeup_ms - RTC_TICK_TO_MS(RTC_get_tick())), cpu_claims);
       //print("..snoozing for %i ms, %i resources claimed\n", (u32_t)(wakeup_ms - RTC_TICK_TO_MS(RTC_get_tick())), cpu_claims);
-      while (RTC_get_tick() <= wu_tick && cpu_claims) {
-        ASSERT(RTC_get_tick() < wu_tick+10ULL);
-        //__WFI();
+      while (RTC_get_tick() <= wu_tick && cpu_claims && !TASK_tick()) {
+        __WFI();
       }
     } else {
       // no one holding any resource, sleep
