@@ -15,6 +15,7 @@
 #include "linker_symaccess.h"
 #include "wdog.h"
 #include "rtc.h"
+#include "sensor.h"
 #include <stdarg.h>
 
 static volatile u8_t cpu_claims;
@@ -40,17 +41,13 @@ static void app_cli_release(void) {
   cli_claimed = FALSE;
 }
 
-static bool detect_uart(void) {
+static bool app_detect_uart(void) {
   gpio_config(PORTA, PIN3, CLK_50MHZ, IN, AF0, OPENDRAIN, PULLDOWN);
   SYS_hardsleep_ms(2); // wait for pin to stabilize
-  int i;
-  for (i = 0; i < 3; i++) {
-    if (gpio_get(PORTA, PIN3)) return TRUE;
-    SYS_hardsleep_ms(1);
-  }
+  bool res = gpio_get(PORTA, PIN3);
   // reset to uart config
   gpio_config(PORTA, PIN3, CLK_50MHZ, IN, AF0, OPENDRAIN, NOPULL);
-  return FALSE;
+  return res;
 }
 
 static void cli_task_on_input(u32_t len, void *p) {
@@ -72,7 +69,7 @@ static void cli_tmo(u32_t a, void *p) {
   }
 }
 
-static void cli_rx_avail(u8_t io, void *arg, u16_t available) {
+static void cli_rx_avail_irq(u8_t io, void *arg, u16_t available) {
   if (!cli_rd) {
     task *t = TASK_create(cli_task_on_input, 0);
     TASK_run(t, 0, (void *)((u32_t)io));
@@ -80,12 +77,12 @@ static void cli_rx_avail(u8_t io, void *arg, u16_t available) {
   }
 }
 
-static void heartbeat(u32_t ignore, void *ignore_more) {
+static void heartbeat_irq(u32_t ignore, void *ignore_more) {
   gpio_disable(PIN_LED);
 
   WDOG_feed();
 
-  bool is_uart_connected = detect_uart();
+  bool is_uart_connected = app_detect_uart();
   if (is_uart_connected && !was_uart_connected && !cli_claimed) {
     DBG(D_SYS, D_DEBUG, "UART reconnected\n");
     app_cli_claim();
@@ -93,7 +90,10 @@ static void heartbeat(u32_t ignore, void *ignore_more) {
   was_uart_connected = is_uart_connected;
 
   gpio_enable(PIN_LED);
+}
 
+static void acc_pin_irq(gpio_pin pin) {
+  print("ACC INTERRUPT\n");
 }
 
 static void sleep_stop_restore(void)
@@ -234,19 +234,26 @@ void APP_init(void) {
 
   cpu_claims = 0;
 
-  task *heatbeat_task = TASK_create(heartbeat, TASK_STATIC);
+  task *heatbeat_task = TASK_create(heartbeat_irq, TASK_STATIC);
   TASK_start_timer(heatbeat_task, &heartbeat_timer, 0, 0, 0, APP_HEARTBEAT_MS, "heartbeat");
 
   cli_tmo_task = TASK_create(cli_tmo, TASK_STATIC);
-  if (detect_uart()) {
+  if (app_detect_uart()) {
     app_cli_claim();
   } else {
     cli_tmo_last_time = 0;
   }
 
-  WS2812B_STM32F1_init(NULL);
   cli_rd = FALSE;
-  IO_set_callback(IOSTD, cli_rx_avail, NULL);
+  IO_set_callback(IOSTD, cli_rx_avail_irq, NULL);
+
+  WS2812B_STM32F1_init(NULL);
+
+  gpio_config(PIN_ACC_INT, CLK_10MHZ, IN, AF0, OPENDRAIN, PULLDOWN);
+  gpio_interrupt_config(PIN_ACC_INT, acc_pin_irq, FLANK_UP);
+  gpio_interrupt_mask_enable(PIN_ACC_INT, TRUE);
+
+  SENS_init();
 
   app_spin();
 }
@@ -276,9 +283,46 @@ void APP_release(u8_t resource) {
 }
 
 
+static s32_t cli_info(u32_t argc) {
+  RCC_ClocksTypeDef clocks;
+  print("DEV:%08x REV:%08x\n", DBGMCU_GetDEVID(), DBGMCU_GetREVID());
+  RCC_GetClocksFreq(&clocks);
+  print(
+      "HCLK:  %i\n"
+      "PCLK1: %i\n"
+      "PCLK2: %i\n"
+      "SYSCLK:%i\n"
+      "ADCCLK:%i\n",
+      clocks.HCLK_Frequency,
+      clocks.PCLK1_Frequency,
+      clocks.PCLK2_Frequency,
+      clocks.SYSCLK_Frequency,
+      clocks.ADCCLK_Frequency);
+  print(
+      "RTCCLK:%i\n"
+      "RTCDIV:%i\n"
+      "RTCTCK:%i ticks/sec\n",
+      CONFIG_RTC_CLOCK_HZ,
+      CONFIG_RTC_PRESCALER,
+      CONFIG_RTC_CLOCK_HZ/CONFIG_RTC_PRESCALER
+      );
+  u64_t rtccnt = RTC_get_tick();
+  u64_t rtcalm = RTC_get_alarm_tick();
+
+  print(
+      "RTCCNT:%08x%08x\n"
+      "RTCALR:%08x%08x\n",
+      (u32_t)(rtccnt>>32),(u32_t)rtccnt,
+      (u32_t)(rtcalm>>32),(u32_t)rtcalm
+      );
+  return CLI_OK;
+}
+
+
 CLI_EXTERN_MENU(common)
 
 CLI_MENU_START_MAIN
 CLI_EXTRAMENU(common)
+CLI_FUNC("info", cli_info, "Prints system info")
 CLI_FUNC("help", cli_help, "Prints help")
 CLI_MENU_END

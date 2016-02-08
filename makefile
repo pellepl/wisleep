@@ -110,9 +110,9 @@ include ${CONFIG_MAKE}
 CFILES 		+= main.c
 CFILES 		+= processor.c
 CFILES 		+= timer.c
-CFILES		+= ws2812b_spi_stm32f1.c
 
-CFILES		+= app.c
+CFILES		+= app.c sensor.c
+CFILES		+= ws2812b_spi_stm32f1.c
 
 # stm32 lib files
 #SPATH	+= ${stmdriverdir}/src ${stmcmsisdir} ${stmcmsisdir}/startup/gcc_ride7

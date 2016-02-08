@@ -187,7 +187,7 @@ typedef u16_t system_counter_type;
 
 #define WS2812B_NBR_OF_LEDS 16
 #define CONFIG_RTC_CLOCK_HZ 32768
-#define CONFIG_RTC_PRESCALER 16
+#define CONFIG_RTC_PRESCALER 32
 
 
 /** DEBUG **/
