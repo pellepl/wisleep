@@ -111,7 +111,7 @@ CFILES 		+= main.c
 CFILES 		+= processor.c
 CFILES 		+= timer.c
 
-CFILES		+= app.c sensor.c
+CFILES		+= app.c sensor.c lamp.c
 CFILES		+= ws2812b_spi_stm32f1.c
 
 # stm32 lib files

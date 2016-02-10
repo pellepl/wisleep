@@ -16,6 +16,7 @@
 #include "wdog.h"
 #include "rtc.h"
 #include "sensor.h"
+#include "lamp.h"
 #include <stdarg.h>
 
 static volatile u8_t cpu_claims;
@@ -246,10 +247,10 @@ void APP_init(void) {
   cli_rd = FALSE;
   IO_set_callback(IOSTD, cli_rx_avail_irq, NULL);
 
-  WS2812B_STM32F1_init(NULL);
-
   SENS_init();
   SENS_enter_active();
+
+  LAMP_init();
 
   app_spin();
 }
@@ -279,6 +280,11 @@ void APP_release(u8_t resource) {
 }
 
 void APP_report_activity(bool activity, bool inactivity, bool tap, bool doubletap, bool issleep) {
+  if (doubletap) {
+    LAMP_enable(FALSE);
+  } else if (tap) {
+    LAMP_enable(TRUE);
+  }
   if (inactivity || issleep) {
     SENS_enter_idle();
   } else if (activity || tap || doubletap) {
@@ -286,6 +292,26 @@ void APP_report_activity(bool activity, bool inactivity, bool tap, bool doubleta
   }
 }
 
+void APP_report_temperature(float temp) {
+  print("temperature %i.%i°C\n", (int)(temp), (int)((temp - (int)temp)* 10.0));
+}
+
+void APP_report_data(
+    s16_t ax, s16_t ay, s16_t az,
+    s16_t mx, s16_t my, s16_t mz,
+    s16_t gx, s16_t gy, s16_t gz) {
+  ax += 12; ay += 12;
+  if (ax < -20) {
+    LAMP_cycle_delta(ax+20);
+  } else if (ax > 20) {
+    LAMP_cycle_delta(ax-20);
+  }
+  if (ay < -20) {
+    LAMP_light_delta(ay+20);
+  } else if (ay > 20) {
+    LAMP_light_delta(ay-20);
+  }
+}
 
 static s32_t cli_temp(u32_t argc) {
   SENS_read_temp();

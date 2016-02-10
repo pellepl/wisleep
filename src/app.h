@@ -29,7 +29,8 @@
 #define CLAIM_ACC             0x02
 #define CLAIM_MAG             0x03
 #define CLAIM_GYR             0x04
-#define CLAIM_LGT             0x05
+#define CLAIM_LMP             0x05
+#define CLAIM_SWP             0x06
 
 // initializes application
 void APP_init(void);
@@ -37,5 +38,10 @@ void APP_shutdown(void);
 void APP_claim(u8_t resource);
 void APP_release(u8_t resource);
 void APP_report_activity(bool activity, bool inactivity, bool tap, bool doubletap, bool issleep);
+void APP_report_temperature(float temp);
+void APP_report_data(
+    s16_t ax, s16_t ay, s16_t az,
+    s16_t mx, s16_t my, s16_t mz,
+    s16_t gx, s16_t gy, s16_t gz);
 
 #endif /* APP_H_ */

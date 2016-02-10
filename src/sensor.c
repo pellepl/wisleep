@@ -62,8 +62,8 @@ static volatile enum {
 static adxl_cfg acc_cfg = {
     .pow_low_power = FALSE,
     .pow_rate = ADXL345_RATE_12_5_LP,
-    .pow_link = TRUE,
-    .pow_auto_sleep = TRUE,
+    .pow_link = FALSE, //TRUE,
+    .pow_auto_sleep = FALSE, //TRUE,
     .pow_mode = ADXL345_MODE_MEASURE,
     .pow_sleep = FALSE,
     .pow_sleep_rate = ADXL345_SLEEP_RATE_8,
@@ -75,7 +75,7 @@ static adxl_cfg acc_cfg = {
     .tap_window = 200, //*1.25ms
     .tap_suppress = FALSE,
 
-    .act_ac_dc = ADXL345_DC,
+    .act_ac_dc = ADXL345_AC,
     .act_ena = ADXL345_XYZ,
     .act_inact_ena = ADXL345_XYZ,
     .act_thr_act = 18, //*62.5mg
@@ -89,8 +89,8 @@ static adxl_cfg acc_cfg = {
     .int_map = 0b00000000,
 
     .format_int_inv = FALSE,
-    .format_full_res = TRUE,
-    .format_justify = TRUE,
+    .format_full_res = FALSE,
+    .format_justify = FALSE,
     .format_range = ADXL345_RANGE_2G,
 
     .fifo_mode = ADXL345_FIFO_BYPASS,
@@ -241,7 +241,7 @@ static void gyr_cb_irq(itg3200_dev *dev, itg_state s, int res) {
       } else {
         float ftemp = (float)result.data.gyr.temp / 280.0 + 82;
         DBG(D_APP, D_DEBUG, "sensor temp:%i (%i.%i°C)\n", result.data.gyr.temp, (int)(ftemp), (int)((ftemp - (int)ftemp)* 10.0));
-        print("sensor temp:%i (%i.%i°C)\n", result.data.gyr.temp, (int)(ftemp), (int)((ftemp - (int)ftemp)* 10.0));
+        APP_report_temperature(ftemp);
       }
       // trigger an sr read to detect accelerometer inactive
       sensor_trigger_read_sr();
@@ -251,6 +251,10 @@ static void gyr_cb_irq(itg3200_dev *dev, itg_state s, int res) {
         DBG(D_APP, D_WARN, "sens read mag data err: %i\n", res);
       } else {
         DBG(D_APP, D_DEBUG, "sensor data acc:%04x %04x %04x mag:%04x %04x %04x gyr:%04x %04x %04x\n",
+          result.data.acc.x, result.data.acc.y, result.data.acc.z,
+          result.data.mag.x, result.data.mag.y, result.data.mag.z,
+          result.data.gyr.x, result.data.gyr.y, result.data.gyr.z);
+        APP_report_data(
           result.data.acc.x, result.data.acc.y, result.data.acc.z,
           result.data.mag.x, result.data.mag.y, result.data.mag.z,
           result.data.gyr.x, result.data.gyr.y, result.data.gyr.z);
@@ -473,6 +477,7 @@ static void actinact_config_done(void) {
   }
   TASK_mutex_unlock(&i2c_mutex);
 }
+
 void SENS_read_temp(void) {
   if (temp_read_bsy) return;
   temp_read_bsy = TRUE;
