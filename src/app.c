@@ -169,7 +169,7 @@ static void app_spin(void) {
       }
     } else {
       // no one holding any resource, sleep
-      DBG(D_APP, D_INFO, "..sleeping for %i ms\n", (u32_t)(wakeup_ms - RTC_TICK_TO_MS(RTC_get_tick())));
+      DBG(D_APP, D_INFO, "..sleeping for %i ms\n   ", (u32_t)(wakeup_ms - RTC_TICK_TO_MS(RTC_get_tick())));
       //print("..sleeping for %i ms\n  ", (u32_t)(wakeup_ms - RTC_TICK_TO_MS(RTC_get_tick())));
       irq_disable();
       IO_tx_flush(IOSTD);
@@ -269,6 +269,15 @@ void APP_release(u8_t resource) {
   cpu_claims--;
   irq_enable();
 }
+
+void APP_report_activity(bool activity, bool inactivity, bool tap, bool doubletap, bool issleep) {
+  if (inactivity || issleep) {
+    SENS_enter_idle();
+  } else if (activity || tap || doubletap) {
+    SENS_enter_active();
+  }
+}
+
 
 static s32_t cli_temp(u32_t argc) {
   SENS_read_temp();

@@ -38,12 +38,22 @@ static task *acc_sr_task;
 static task *gyr_temp_task;
 static volatile bool acc_sr_read_bsy = FALSE;
 static volatile bool temp_read_bsy = FALSE;
+
+static volatile bool active_bsy = FALSE;
+static volatile bool inactive_bsy = FALSE;
+static volatile bool active = FALSE;
+static task *actinact_task;
+
+static void actinact_config_done(void);
+static void sensor_trigger_read_sr(void);
+
 static volatile enum {
   SENS_IDLE = 0,
   SENS_READ_SR,
   SENS_READ_DATA,
   SENS_READ_TEMP,
-  SENS_CONFIG
+  SENS_ACTINACT,
+  SENS_CONFIG_INITIAL
 } state = SENS_IDLE;
 
 
@@ -131,7 +141,7 @@ static void acc_cb_irq(adxl345_dev *dev, adxl_state s, int res) {
     TASK_mutex_unlock(&i2c_mutex);
     if (res != I2C_OK)
       DBG(D_APP, D_WARN, "sens read sr err: %i\n", res);
-    else
+    else {
       DBG(D_APP, D_DEBUG, "sens adxl state:\n"
           "  int raw       : %08b\n"
           "  int dataready : %i\n"
@@ -169,8 +179,17 @@ static void acc_cb_irq(adxl345_dev *dev, adxl_state s, int res) {
           result.acc_status.fifo_status.fifo_trig,
           result.acc_status.fifo_status.entries
           );
+      APP_report_activity(
+          result.acc_status.int_src & ADXL345_INT_ACTIVITY,
+          result.acc_status.int_src & ADXL345_INT_INACTIVITY,
+          result.acc_status.int_src & ADXL345_INT_SINGLE_TAP,
+          result.acc_status.int_src & ADXL345_INT_DOUBLE_TAP,
+          result.acc_status.act_tap_status.asleep
+          );
+      APP_release(CLAIM_ACC);
+    }
     break;
-  case SENS_CONFIG:
+  case SENS_CONFIG_INITIAL:
     state = SENS_IDLE;
     break;
   default:
@@ -195,7 +214,12 @@ static void mag_cb_irq(hmc5883l_dev *dev, hmc_state s, int res) {
       }
     }
     break;
-  case SENS_CONFIG:
+  case SENS_ACTINACT:
+    ASSERT(res == I2C_OK);
+    res = itg_config(&gyr_dev, &gyr_cfg);
+    ASSERT(res == I2C_OK);
+    break;
+  case SENS_CONFIG_INITIAL:
     state = SENS_IDLE;
     break;
   default:
@@ -226,7 +250,11 @@ static void gyr_cb_irq(itg3200_dev *dev, itg_state s, int res) {
     }
     state = SENS_IDLE;
     break;
-  case SENS_CONFIG:
+  case SENS_ACTINACT:
+    ASSERT(res == I2C_OK);
+    actinact_config_done();
+    break;
+  case SENS_CONFIG_INITIAL:
     state = SENS_IDLE;
     break;
   default:
@@ -242,15 +270,37 @@ static void gyr_cb_irq(itg3200_dev *dev, itg_state s, int res) {
 
 static void acc_pin_irq(gpio_pin pin) {
   DBG(D_APP, D_DEBUG, "sens acc pin irq\n");
-  if (!acc_sr_read_bsy) {
-    acc_sr_read_bsy = TRUE;
-    TASK_run(acc_sr_task, 0, NULL);
-  }
+  sensor_trigger_read_sr();
 }
 
 //
 // sensor task functions
 //
+
+static void sensor_trigger_read_sr(void) {
+  if (!acc_sr_read_bsy) {
+    APP_claim(CLAIM_ACC);
+    acc_sr_read_bsy = TRUE;
+    TASK_run(acc_sr_task, 0, NULL);
+  }
+}
+
+static void sensor_actinact(u32_t activate_else_inactivate, void *p) {
+  if (!TASK_mutex_lock(&i2c_mutex)) return;
+  state = SENS_ACTINACT;
+
+  gyr_cfg.pwr_sleep = activate_else_inactivate ? ITG3200_ACTIVE : ITG3200_LOW_POWER;
+
+  int res = hmc_config(&mag_dev,
+      activate_else_inactivate ? hmc5883l_mode_continuous : hmc5883l_mode_idle,
+          hmc5883l_i2c_speed_normal,
+          hmc5883l_gain_1_3,
+          hmc5883l_measurement_mode_normal,
+          hmc5883l_data_output_35,
+          hmc5883l_samples_avg_2
+      );
+  ASSERT(res == I2C_OK);
+}
 
 static void sensor_read(u32_t a, void *p) {
   if (!TASK_mutex_lock(&i2c_mutex)) return;
@@ -272,6 +322,7 @@ static void acc_sr_read(u32_t a, void *p) {
     acc_sr_read_bsy = FALSE;
     state = SENS_IDLE;
     TASK_mutex_unlock(&i2c_mutex);
+    APP_release(CLAIM_ACC);
   }
 }
 
@@ -294,6 +345,8 @@ static void gyr_temp_read(u32_t a, void *p) {
 void SENS_init(void) {
   int res;
   // setup tasks
+  actinact_task = TASK_create(sensor_actinact, TASK_STATIC);
+  ASSERT(actinact_task);
   sensor_task = TASK_create(sensor_read, TASK_STATIC);
   ASSERT(sensor_task);
   acc_sr_task = TASK_create(acc_sr_read, TASK_STATIC);
@@ -307,39 +360,46 @@ void SENS_init(void) {
   hmc_open(&mag_dev, I2C_BUS, I2C_CLK, mag_cb_irq);
   itg_open(&gyr_dev, I2C_BUS, FALSE, I2C_CLK, gyr_cb_irq);
 
+#if 0
   // check that devices are online
+  // busy polling here - if i2c does not work we cannot start anyway
   DBG(D_APP, D_DEBUG, "sens check all online\n");
   int ok_ids = 0, i;
   for (i = 0; i < 3; i++) {
-    state = SENS_CONFIG;
+    state = SENS_CONFIG_INITIAL;
     res = adxl_check_id(&acc_dev, &result.check_id);
     ASSERT(res == I2C_OK);
-    while (state == SENS_CONFIG) __WFI();
+    while (state == SENS_CONFIG_INITIAL) __WFI();
     if (result.check_id) ok_ids++;
+    else DBG(D_APP, D_WARN, "sens missing acc\n");
 
-    state = SENS_CONFIG;
+
+    state = SENS_CONFIG_INITIAL;
     res = hmc_check_id(&mag_dev, &result.check_id);
     ASSERT(res == I2C_OK);
-    while (state == SENS_CONFIG) __WFI();
+    while (state == SENS_CONFIG_INITIAL) __WFI();
     if (result.check_id) ok_ids++;
+    else DBG(D_APP, D_WARN, "sens missing mag\n");
 
-    state = SENS_CONFIG;
+    state = SENS_CONFIG_INITIAL;
     res = itg_check_id(&gyr_dev, &result.check_id);
     ASSERT(res == I2C_OK);
-    while (state == SENS_CONFIG) __WFI();
+    while (state == SENS_CONFIG_INITIAL) __WFI();
     if (result.check_id) ok_ids++;
+    else DBG(D_APP, D_WARN, "sens missing gyr\n");
   }
   ASSERT(ok_ids >= 7);
+#endif
 
   DBG(D_APP, D_DEBUG, "sens configure\n");
   // config acc
-  state = SENS_CONFIG;
+  state = SENS_CONFIG_INITIAL;
   res = adxl_config(&acc_dev, &acc_cfg);
   ASSERT(res == I2C_OK);
-  while (state == SENS_CONFIG) __WFI();
+  while (state == SENS_CONFIG_INITIAL) __WFI();
 
   // config mag
-  state = SENS_CONFIG;
+  state = SENS_CONFIG_INITIAL;
   res = hmc_config(&mag_dev,
       hmc5883l_mode_continuous,
       hmc5883l_i2c_speed_normal,
@@ -349,13 +409,13 @@ void SENS_init(void) {
       hmc5883l_samples_avg_2
       );
   ASSERT(res == I2C_OK);
-  while (state == SENS_CONFIG) __WFI();
+  while (state == SENS_CONFIG_INITIAL) __WFI();
 
   // config gyr
-  state = SENS_CONFIG;
+  state = SENS_CONFIG_INITIAL;
   res = itg_config(&gyr_dev, &gyr_cfg);
   ASSERT(res == I2C_OK);
-  while (state == SENS_CONFIG) __WFI();
+  while (state == SENS_CONFIG_INITIAL) __WFI();
 
   DBG(D_APP, D_DEBUG, "sens setup pin irq\n");
   // config gpio
@@ -367,24 +427,43 @@ void SENS_init(void) {
 }
 
 void SENS_enter_active(void) {
+  if (active || inactive_bsy || active_bsy) {
+    return;
+  }
+  DBG(D_APP, D_INFO, "sens ACTIVATING\n");
   APP_claim(CLAIM_SEN);
-  TASK_start_timer(sensor_task, &sensor_timer, 0, 0, 0, 100, "sensor");
+  active_bsy = TRUE;
+  TASK_run(actinact_task, TRUE, NULL);
 }
 
 void SENS_enter_idle(void) {
-  TASK_stop_timer(&sensor_timer);
-  hmc_config(&mag_dev,
-      hmc5883l_mode_idle,
-      hmc5883l_i2c_speed_normal,
-      hmc5883l_gain_1_3,
-      hmc5883l_measurement_mode_normal,
-      hmc5883l_data_output_15,
-      hmc5883l_samples_avg_1
-      );
-  gyr_cfg.pwr_sleep = ITG3200_LOW_POWER;
-  itg_config(&gyr_dev, ITG3200_INT_ACTIVE_HI);
+  if (!active || inactive_bsy || active_bsy) {
+    return;
+  }
+  DBG(D_APP, D_INFO, "sens DEACTIVATING\n");
+  inactive_bsy = TRUE;
+  TASK_run(actinact_task, FALSE, NULL);
 }
 
+static void actinact_config_done(void) {
+  if (active_bsy) {
+    TASK_start_timer(sensor_task, &sensor_timer, 0, 0, 20, 100, "sensor");
+    active_bsy = FALSE;
+    active = TRUE;
+    DBG(D_APP, D_INFO, "sens ACTIVATED\n");
+    // trigger a status read
+    sensor_trigger_read_sr();
+  } else if (inactive_bsy) {
+    TASK_stop_timer(&sensor_timer);
+    APP_release(CLAIM_SEN);
+    inactive_bsy = FALSE;
+    active = FALSE;
+    DBG(D_APP, D_INFO, "sens DEACTIVATED\n");
+  } else {
+    ASSERT(FALSE);
+  }
+  TASK_mutex_unlock(&i2c_mutex);
+}
 void SENS_read_temp(void) {
   if (temp_read_bsy) return;
   temp_read_bsy = TRUE;

@@ -11,5 +11,8 @@
 #include "system.h"
 
 void SENS_init(void);
+void SENS_enter_active(void);
+void SENS_enter_idle(void);
+void SENS_read_temp(void);
 
 #endif /* SRC_SENSOR_H_ */

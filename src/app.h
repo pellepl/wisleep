@@ -21,7 +21,7 @@
 #define APP_WDOG_TIMEOUT_S              23
 #define APP_HEARTBEAT_MS                20000
 #define APP_CLI_POLL_MS                 1000
-#define APP_CLI_INACT_SHUTDOWN_S        30
+#define APP_CLI_INACT_SHUTDOWN_S        3
 
 #define CLAIM_CLI             0x00
 #define CLAIM_SEN             0x01
@@ -35,5 +35,6 @@ void APP_init(void);
 void APP_shutdown(void);
 void APP_claim(u8_t resource);
 void APP_release(u8_t resource);
+void APP_report_activity(bool activity, bool inactivity, bool tap, bool doubletap, bool issleep);
 
 #endif /* APP_H_ */
