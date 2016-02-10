@@ -116,7 +116,6 @@ static void UART2_config() {
 #endif
 }
 
-#if 0
 static void TIM_config(void) {
   TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
 
@@ -139,7 +138,6 @@ static void TIM_config(void) {
   /* TIM enable counter */
   TIM_Cmd(STM32_SYSTEM_TIMER, ENABLE);
 }
-#endif
 
 static void I2C_config(void) {
 #ifdef CONFIG_I2C
@@ -273,7 +271,7 @@ static void SPI_config() {
 void PROC_base_init() {
   RCC_config();
   NVIC_config();
-  //TIM_config();
+  TIM_config();
 }
 
 void PROC_periph_init() {

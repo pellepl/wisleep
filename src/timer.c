@@ -13,7 +13,7 @@
 #include "taskq.h"
 
 void TIMER_irq() {
-  if (TIM_GetITStatus(STM32_SYSTEM_TIMER, TIM_IT_Update) != RESET) {
+/*  if (TIM_GetITStatus(STM32_SYSTEM_TIMER, TIM_IT_Update) != RESET) {
     TIM_ClearITPendingBit(STM32_SYSTEM_TIMER, TIM_IT_Update);
 
     bool ms_update = SYS_timer();
@@ -22,4 +22,5 @@ void TIMER_irq() {
     }
     TASK_timer();
   }
+  */
 }

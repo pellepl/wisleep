@@ -84,16 +84,12 @@ static void heartbeat_irq(u32_t ignore, void *ignore_more) {
 
   bool is_uart_connected = app_detect_uart();
   if (is_uart_connected && !was_uart_connected && !cli_claimed) {
-    DBG(D_SYS, D_DEBUG, "UART reconnected\n");
+    DBG(D_APP, D_DEBUG, "UART reconnected\n");
     app_cli_claim();
   }
   was_uart_connected = is_uart_connected;
 
   gpio_enable(PIN_LED);
-}
-
-static void acc_pin_irq(gpio_pin pin) {
-  print("ACC INTERRUPT\n");
 }
 
 static void sleep_stop_restore(void)
@@ -118,29 +114,21 @@ static void sleep_stop_restore(void)
 
 static void app_spin(void) {
   while (1) {
-    rtc_datetime dt;
-    RTC_get_date_time(&dt);
     u64_t cur_tick = RTC_get_tick();
-    DBG(D_SYS, D_INFO, "%04i-%02i-%02i %02i:%02i:%02i.%03i %08x %08x\n",
-        dt.date.year,
-        dt.date.month + 1,
-        dt.date.month_day,
-        dt.time.hour,
-        dt.time.minute,
-        dt.time.second,
-        dt.time.millisecond,
-        (u32_t)((cur_tick)>>32), (u32_t)(cur_tick)
-        );
-//    print("%04i-%02i-%02i %02i:%02i:%02i.%03i %08x %08x\n",
-//        dt.date.year,
-//        dt.date.month + 1,
-//        dt.date.month_day,
-//        dt.time.hour,
-//        dt.time.minute,
-//        dt.time.second,
-//        dt.time.millisecond,
-//        (u32_t)((cur_tick)>>32), (u32_t)(cur_tick)
-//        );
+    IF_DBG(D_APP, D_DEBUG) {
+      rtc_datetime dt;
+      RTC_get_date_time(&dt);
+      DBG(D_APP, D_DEBUG, "%04i-%02i-%02i %02i:%02i:%02i.%03i %08x %08x\n",
+          dt.date.year,
+          dt.date.month + 1,
+          dt.date.month_day,
+          dt.time.hour,
+          dt.time.minute,
+          dt.time.second,
+          dt.time.millisecond,
+          (u32_t)((cur_tick)>>32), (u32_t)(cur_tick)
+          );
+    }
 
     // execute all pending tasks
     while (TASK_tick());
@@ -148,7 +136,8 @@ static void app_spin(void) {
     // get nearest timer
     time wakeup_ms;
     volatile u64_t wu_tick = (u64_t)(-1ULL);
-    s32_t no_wakeup = TASK_next_wakeup_ms(&wakeup_ms);
+    task_timer *timer;
+    s32_t no_wakeup = TASK_next_wakeup_ms(&wakeup_ms, &timer);
     s64_t diff_tick = 0;
     if (!no_wakeup) {
       wu_tick = RTC_MS_TO_TICK(wakeup_ms);
@@ -167,18 +156,20 @@ static void app_spin(void) {
     } else {
       // wake us at timer value
       RTC_set_alarm_tick(wu_tick);
+      DBG(D_APP, D_DEBUG, "RTC alarm @ %08x %08x from timer %s\n",
+          (u32_t)(wu_tick>>32),(u32_t)(wu_tick), timer->name);
     }
 
     if (cpu_claims || (!no_wakeup && diff_tick < RTC_MS_TO_TICK(APP_PREVENT_SLEEP_IF_LESS_MS))) {
       // resources held or too soon to wake up to go deep-sleep
-      DBG(D_SYS, D_DEBUG, "..snoozing for %i ms, %i resources claimed\n", (u32_t)(wakeup_ms - RTC_TICK_TO_MS(RTC_get_tick())), cpu_claims);
+      DBG(D_APP, D_INFO, "..snoozing for %i ms, %i resources claimed\n", (u32_t)(wakeup_ms - RTC_TICK_TO_MS(RTC_get_tick())), cpu_claims);
       //print("..snoozing for %i ms, %i resources claimed\n", (u32_t)(wakeup_ms - RTC_TICK_TO_MS(RTC_get_tick())), cpu_claims);
       while (RTC_get_tick() <= wu_tick && cpu_claims && !TASK_tick()) {
         __WFI();
       }
     } else {
       // no one holding any resource, sleep
-      DBG(D_SYS, D_DEBUG, "..sleeping for %i ms\n", (u32_t)(wakeup_ms - RTC_TICK_TO_MS(RTC_get_tick())));
+      DBG(D_APP, D_INFO, "..sleeping for %i ms\n", (u32_t)(wakeup_ms - RTC_TICK_TO_MS(RTC_get_tick())));
       //print("..sleeping for %i ms\n  ", (u32_t)(wakeup_ms - RTC_TICK_TO_MS(RTC_get_tick())));
       irq_disable();
       IO_tx_flush(IOSTD);
@@ -198,7 +189,7 @@ static void app_spin(void) {
       // wake, reconfigure
       sleep_stop_restore();
 
-      DBG(D_SYS, D_DEBUG, "awaken from sleep\n");
+      DBG(D_APP, D_DEBUG, "awaken from sleep\n");
     }
 
     // check if any timers fired and insert them into task queue
@@ -249,11 +240,8 @@ void APP_init(void) {
 
   WS2812B_STM32F1_init(NULL);
 
-  gpio_config(PIN_ACC_INT, CLK_10MHZ, IN, AF0, OPENDRAIN, PULLDOWN);
-  gpio_interrupt_config(PIN_ACC_INT, acc_pin_irq, FLANK_UP);
-  gpio_interrupt_mask_enable(PIN_ACC_INT, TRUE);
-
   SENS_init();
+  SENS_enter_active();
 
   app_spin();
 }
@@ -282,6 +270,10 @@ void APP_release(u8_t resource) {
   irq_enable();
 }
 
+static s32_t cli_temp(u32_t argc) {
+  SENS_read_temp();
+  return CLI_OK;
+}
 
 static s32_t cli_info(u32_t argc) {
   RCC_ClocksTypeDef clocks;
@@ -323,6 +315,7 @@ CLI_EXTERN_MENU(common)
 
 CLI_MENU_START_MAIN
 CLI_EXTRAMENU(common)
+CLI_FUNC("temp", cli_temp, "Reads temperature")
 CLI_FUNC("info", cli_info, "Prints system info")
 CLI_FUNC("help", cli_help, "Prints help")
 CLI_MENU_END

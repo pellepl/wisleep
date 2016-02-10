@@ -24,10 +24,11 @@
 #define APP_CLI_INACT_SHUTDOWN_S        30
 
 #define CLAIM_CLI             0x00
-#define CLAIM_ACC             0x01
-#define CLAIM_MAG             0x02
-#define CLAIM_GYR             0x03
-#define CLAIM_LGT             0x04
+#define CLAIM_SEN             0x01
+#define CLAIM_ACC             0x02
+#define CLAIM_MAG             0x03
+#define CLAIM_GYR             0x04
+#define CLAIM_LGT             0x05
 
 // initializes application
 void APP_init(void);
