@@ -22,6 +22,7 @@ static volatile u8_t cpu_claims;
 static u8_t cli_buf[16];
 volatile bool cli_rd;
 static task_timer heartbeat_timer;
+static task_timer temp_timer;
 static task *cli_tmo_task;
 static task_timer cli_tmo_timer;
 static bool was_uart_connected = FALSE;
@@ -77,7 +78,7 @@ static void cli_rx_avail_irq(u8_t io, void *arg, u16_t available) {
   }
 }
 
-static void heartbeat_irq(u32_t ignore, void *ignore_more) {
+static void heartbeat(u32_t ignore, void *ignore_more) {
   gpio_disable(PIN_LED);
 
   WDOG_feed();
@@ -90,6 +91,10 @@ static void heartbeat_irq(u32_t ignore, void *ignore_more) {
   was_uart_connected = is_uart_connected;
 
   gpio_enable(PIN_LED);
+}
+
+static void read_temp(u32_t ignore, void *ignore_more) {
+  SENS_read_temp();
 }
 
 static void sleep_stop_restore(void)
@@ -225,8 +230,11 @@ void APP_init(void) {
 
   cpu_claims = 0;
 
-  task *heatbeat_task = TASK_create(heartbeat_irq, TASK_STATIC);
+  task *heatbeat_task = TASK_create(heartbeat, TASK_STATIC);
   TASK_start_timer(heatbeat_task, &heartbeat_timer, 0, 0, 0, APP_HEARTBEAT_MS, "heartbeat");
+
+  task *temp_task = TASK_create(read_temp, TASK_STATIC);
+  TASK_start_timer(temp_task, &temp_timer, 0, 0, 0, APP_TEMPERATURE_MS, "temp");
 
   cli_tmo_task = TASK_create(cli_tmo, TASK_STATIC);
   if (app_detect_uart()) {

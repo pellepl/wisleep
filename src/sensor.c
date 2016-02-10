@@ -33,6 +33,7 @@ static union {
 
 static task_mutex i2c_mutex = TASK_MUTEX_INIT;
 static task_timer sensor_timer;
+static task_timer gyr_temp_timer;
 static task *sensor_task;
 static task *acc_sr_task;
 static task *gyr_temp_task;
@@ -233,19 +234,26 @@ static void gyr_cb_irq(itg3200_dev *dev, itg_state s, int res) {
   case SENS_READ_TEMP:
   case SENS_READ_DATA:
     TASK_mutex_unlock(&i2c_mutex);
-    if (res != I2C_OK) {
-      DBG(D_APP, D_WARN, "sens read mag data err: %i\n", res);
-    } else {
-      if (state == SENS_READ_TEMP) {
-        temp_read_bsy = FALSE;
+    if (state == SENS_READ_TEMP) {
+      temp_read_bsy = FALSE;
+      if (res != I2C_OK) {
+        DBG(D_APP, D_WARN, "sens read mag data err: %i\n", res);
+      } else {
         float ftemp = (float)result.data.gyr.temp / 280.0 + 82;
         DBG(D_APP, D_DEBUG, "sensor temp:%i (%i.%i°C)\n", result.data.gyr.temp, (int)(ftemp), (int)((ftemp - (int)ftemp)* 10.0));
         print("sensor temp:%i (%i.%i°C)\n", result.data.gyr.temp, (int)(ftemp), (int)((ftemp - (int)ftemp)* 10.0));
+      }
+      // trigger an sr read to detect accelerometer inactive
+      sensor_trigger_read_sr();
+      APP_release(CLAIM_GYR);
+    } else {
+      if (res != I2C_OK) {
+        DBG(D_APP, D_WARN, "sens read mag data err: %i\n", res);
       } else {
         DBG(D_APP, D_DEBUG, "sensor data acc:%04x %04x %04x mag:%04x %04x %04x gyr:%04x %04x %04x\n",
-            result.data.acc.x, result.data.acc.y, result.data.acc.z,
-            result.data.mag.x, result.data.mag.y, result.data.mag.z,
-            result.data.gyr.x, result.data.gyr.y, result.data.gyr.z);
+          result.data.acc.x, result.data.acc.y, result.data.acc.z,
+          result.data.mag.x, result.data.mag.y, result.data.mag.z,
+          result.data.gyr.x, result.data.gyr.y, result.data.gyr.z);
       }
     }
     state = SENS_IDLE;
@@ -335,6 +343,7 @@ static void gyr_temp_read(u32_t a, void *p) {
     state = SENS_IDLE;
     temp_read_bsy = FALSE;
     TASK_mutex_unlock(&i2c_mutex);
+    APP_release(CLAIM_GYR);
   }
 }
 
@@ -437,7 +446,7 @@ void SENS_enter_active(void) {
 }
 
 void SENS_enter_idle(void) {
-  if (!active || inactive_bsy || active_bsy) {
+  if (temp_read_bsy || !active || inactive_bsy || active_bsy) {
     return;
   }
   DBG(D_APP, D_INFO, "sens DEACTIVATING\n");
@@ -467,5 +476,9 @@ static void actinact_config_done(void) {
 void SENS_read_temp(void) {
   if (temp_read_bsy) return;
   temp_read_bsy = TRUE;
-  TASK_run(gyr_temp_task, 0, NULL);
+  APP_claim(CLAIM_GYR);
+  // turn on sensors now
+  SENS_enter_active();
+  // do not read until gyro temperature ic has stabilized
+  TASK_start_timer(gyr_temp_task, &gyr_temp_timer, 0, NULL, 500, 0, "temp_delay");
 }

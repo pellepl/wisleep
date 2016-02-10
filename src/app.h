@@ -21,6 +21,7 @@
 #define APP_WDOG_TIMEOUT_S              23
 #define APP_HEARTBEAT_MS                20000
 #define APP_CLI_POLL_MS                 1000
+#define APP_TEMPERATURE_MS              1000*60*60
 #define APP_CLI_INACT_SHUTDOWN_S        3
 
 #define CLAIM_CLI             0x00
