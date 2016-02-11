@@ -21,9 +21,11 @@
 static adxl345_dev acc_dev;
 static hmc5883l_dev mag_dev;
 static itg3200_dev gyr_dev;
-static union {
-  bool check_id;
-  adxl_status acc_status;
+static struct {
+  union {
+    bool check_id;
+    adxl_status acc_status;
+  };
   struct {
     adxl_reading acc;
     hmc_reading mag;
@@ -45,8 +47,14 @@ static volatile bool inactive_bsy = FALSE;
 static volatile bool active = FALSE;
 static task *actinact_task;
 
+static volatile bool report_act_bsy = FALSE;
+static volatile bool report_data_bsy = FALSE;
+
+
 static void actinact_config_done(void);
 static void sensor_trigger_read_sr(void);
+static void task_report_act(u32_t sr, void *p);
+static void task_report_data(u32_t a, void *p);
 
 static volatile enum {
   SENS_IDLE = 0,
@@ -69,7 +77,7 @@ static adxl_cfg acc_cfg = {
     .pow_sleep_rate = ADXL345_SLEEP_RATE_8,
 
     .tap_ena = ADXL345_XYZ,
-    .tap_thresh = 20, //*62.5mg
+    .tap_thresh = 30, //*62.5mg
     .tap_dur = 15, //*625us
     .tap_latent = 80, //*1.25ms
     .tap_window = 200, //*1.25ms
@@ -180,13 +188,18 @@ static void acc_cb_irq(adxl345_dev *dev, adxl_state s, int res) {
           result.acc_status.fifo_status.fifo_trig,
           result.acc_status.fifo_status.entries
           );
-      APP_report_activity(
-          result.acc_status.int_src & ADXL345_INT_ACTIVITY,
-          result.acc_status.int_src & ADXL345_INT_INACTIVITY,
-          result.acc_status.int_src & ADXL345_INT_SINGLE_TAP,
-          result.acc_status.int_src & ADXL345_INT_DOUBLE_TAP,
-          result.acc_status.act_tap_status.asleep
-          );
+      if (!report_act_bsy) {
+        report_act_bsy = TRUE;
+        task *t = TASK_create(task_report_act, 0);
+        u32_t sr = 0 |
+            (result.acc_status.int_src & ADXL345_INT_ACTIVITY   ? (1<<0) : 0) |
+            (result.acc_status.int_src & ADXL345_INT_INACTIVITY ? (1<<1) : 0) |
+            (result.acc_status.int_src & ADXL345_INT_SINGLE_TAP ? (1<<2) : 0) |
+            (result.acc_status.int_src & ADXL345_INT_DOUBLE_TAP ? (1<<3) : 0) |
+            (result.acc_status.act_tap_status.asleep            ? (1<<4) : 0)
+            ;
+        TASK_run(t, sr, NULL);
+      }
       APP_release(CLAIM_ACC);
     }
     break;
@@ -254,10 +267,11 @@ static void gyr_cb_irq(itg3200_dev *dev, itg_state s, int res) {
           result.data.acc.x, result.data.acc.y, result.data.acc.z,
           result.data.mag.x, result.data.mag.y, result.data.mag.z,
           result.data.gyr.x, result.data.gyr.y, result.data.gyr.z);
-        APP_report_data(
-          result.data.acc.x, result.data.acc.y, result.data.acc.z,
-          result.data.mag.x, result.data.mag.y, result.data.mag.z,
-          result.data.gyr.x, result.data.gyr.y, result.data.gyr.z);
+        if (!report_data_bsy) {
+          report_data_bsy = TRUE;
+          task *t = TASK_create(task_report_data, 0);
+          TASK_run(t, 0, NULL);
+        }
       }
     }
     state = SENS_IDLE;
@@ -288,6 +302,25 @@ static void acc_pin_irq(gpio_pin pin) {
 //
 // sensor task functions
 //
+
+static void task_report_act(u32_t sr, void *p) {
+  report_act_bsy = FALSE;
+  APP_report_activity(
+      ((sr & (1<<0)) != 0), //bool activity,
+      ((sr & (1<<1)) != 0), //bool inactivity,
+      ((sr & (1<<2)) != 0), //bool tap,
+      ((sr & (1<<3)) != 0), //bool doubletap,
+      ((sr & (1<<4)) != 0)  //bool issleep
+      );
+}
+
+static void task_report_data(u32_t a, void *p) {
+  report_data_bsy = FALSE;
+  APP_report_data(
+    result.data.acc.x, result.data.acc.y, result.data.acc.z,
+    result.data.mag.x, result.data.mag.y, result.data.mag.z,
+    result.data.gyr.x, result.data.gyr.y, result.data.gyr.z);
+}
 
 static void sensor_trigger_read_sr(void) {
   if (!acc_sr_read_bsy) {

@@ -65,6 +65,8 @@ static u32_t dst_color = 0;
 static u32_t lst_color = 0;
 static u32_t cur_color = 0;
 static u8_t factor = 0;
+static task *lamp_update_task;
+static task_timer lamp_update_timer;
 static volatile bool lamp_bus_bsy = FALSE;
 static volatile bool lamp_dirty = FALSE;
 
@@ -118,6 +120,7 @@ static bool lamp_regulate(void) {
       APP_release(CLAIM_LMP);
       print("lamp off\n");
     }
+    TASK_stop_timer(&lamp_update_timer);
     res = FALSE;
   }
   if (res) lamp_output();
@@ -132,22 +135,28 @@ static void lamp_cb_irq(bool error) {
     print("lamp dirty\n");
     lamp_output();
   } else {
-    lamp_regulate();
+    //lamp_regulate();
   }
 }
 
-static void lamp_update(void) {
+static void lamp_task(u32_t a, void *p) {
   lamp_regulate();
+}
+
+static void lamp_update(void) {
+  TASK_stop_timer(&lamp_update_timer);
+  TASK_start_timer(lamp_update_task, &lamp_update_timer, 0, NULL, 2, 2, "lamp");
 }
 
 void LAMP_init(void) {
   WS2812B_STM32F1_init(lamp_cb_irq);
-  lst_color = 0x807040;
+  lst_color = colors[2];
   src_color = 0;
   dst_color = 0;
   cur_color = 0;
   light = 0xf0;
   factor = 0;
+  lamp_update_task = TASK_create(lamp_task, TASK_STATIC);
 }
 
 void LAMP_enable(bool ena) {
@@ -189,6 +198,7 @@ void LAMP_cycle_delta(s16_t dcycle) {
 }
 
 void LAMP_light_delta(s8_t dlight) {
+  src_color = cur_color;
   light += dlight;
   light = MAX(light, 0x20);
   light = MIN(light, 0xf0);

@@ -24,8 +24,9 @@ static u8_t cli_buf[16];
 volatile bool cli_rd;
 static task_timer heartbeat_timer;
 static task_timer temp_timer;
-static task *cli_tmo_task;
+static task *temp_task;
 static task_timer cli_tmo_timer;
+static task *cli_tmo_task;
 static bool was_uart_connected = FALSE;
 static u64_t cli_tmo_last_time = 0;
 static bool cli_claimed = FALSE;
@@ -235,8 +236,8 @@ void APP_init(void) {
   task *heatbeat_task = TASK_create(heartbeat, TASK_STATIC);
   TASK_start_timer(heatbeat_task, &heartbeat_timer, 0, 0, 0, APP_HEARTBEAT_MS, "heartbeat");
 
-  task *temp_task = TASK_create(read_temp, TASK_STATIC);
-  TASK_start_timer(temp_task, &temp_timer, 0, 0, 0, APP_TEMPERATURE_MS, "temp");
+  temp_task = TASK_create(read_temp, TASK_STATIC);
+  TASK_start_timer(temp_task, &temp_timer, 0, 0, 1000, APP_TEMPERATURE_MS, "temp");
 
   cli_tmo_task = TASK_create(cli_tmo, TASK_STATIC);
   if (app_detect_uart()) {
