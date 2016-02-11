@@ -29,6 +29,7 @@ static task_timer cli_tmo_timer;
 static bool was_uart_connected = FALSE;
 static u64_t cli_tmo_last_time = 0;
 static bool cli_claimed = FALSE;
+static u64_t sensor_idle_tick = 0;
 
 static void app_cli_claim(void) {
   APP_claim(CLAIM_CLI);
@@ -280,15 +281,16 @@ void APP_release(u8_t resource) {
 }
 
 void APP_report_activity(bool activity, bool inactivity, bool tap, bool doubletap, bool issleep) {
-  if (doubletap) {
-    LAMP_enable(FALSE);
-  } else if (tap) {
-    LAMP_enable(TRUE);
-  }
-  if (inactivity || issleep) {
+  if (issleep) {
     SENS_enter_idle();
   } else if (activity || tap || doubletap) {
     SENS_enter_active();
+    sensor_idle_tick = RTC_get_tick();
+  }
+
+  if ((tap || doubletap)) {
+    LAMP_enable(!LAMP_on());
+    sensor_idle_tick = RTC_get_tick();
   }
 }
 
@@ -300,16 +302,28 @@ void APP_report_data(
     s16_t ax, s16_t ay, s16_t az,
     s16_t mx, s16_t my, s16_t mz,
     s16_t gx, s16_t gy, s16_t gz) {
-  ax += 12; ay += 12;
-  if (ax < -20) {
-    LAMP_cycle_delta(ax+20);
-  } else if (ax > 20) {
-    LAMP_cycle_delta(ax-20);
+  if (LAMP_on()) {
+    ax += 12; ay += 12;
+    int scyc = ax < 0 ? -1 : 1;
+    int slig = ay < 0 ? -1 : 1;
+    int dcyc = ABS(ax);
+    int dlig = ABS(ay);
+    if (dcyc > 20) {
+      dcyc -= 20;
+      dcyc = 1 + MIN(64, dcyc/2);
+      LAMP_cycle_delta(scyc*dcyc);
+      sensor_idle_tick = RTC_get_tick();
+    }
+    if (dlig > 20) {
+      dlig -= 20;
+      dlig = 1 + MIN(24, dlig/4);
+      LAMP_light_delta(slig*dlig);
+      sensor_idle_tick = RTC_get_tick();
+    }
   }
-  if (ay < -20) {
-    LAMP_light_delta(ay+20);
-  } else if (ay > 20) {
-    LAMP_light_delta(ay-20);
+
+  if (RTC_TICK_TO_S(RTC_get_tick() - sensor_idle_tick) >= APP_KEEP_SENSORS_ALIVE_S) {
+    SENS_enter_idle();
   }
 }
 

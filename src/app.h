@@ -23,6 +23,7 @@
 #define APP_CLI_POLL_MS                 1000
 #define APP_TEMPERATURE_MS              1000*60*60
 #define APP_CLI_INACT_SHUTDOWN_S        3
+#define APP_KEEP_SENSORS_ALIVE_S        15
 
 #define CLAIM_CLI             0x00
 #define CLAIM_SEN             0x01

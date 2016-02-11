@@ -12,6 +12,10 @@
 #include "ws2812b_spi_stm32f1.h"
 #include "miniutils.h"
 
+#define FACTOR_DELTA      1
+#define TIME_DELTA_MS     6
+
+
 static const u8_t gamma[] = {
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,
@@ -32,6 +36,12 @@ static const u8_t gamma[] = {
 
 static const u32_t colors[] = {
     0xffffff,
+    0xffffa0,
+    0xffe080,
+    0xffa040,
+    0xff0000,
+    0x00ff00,
+    0x0000ff,
     0xff00ff,
     0xffff00,
     0x00ffff,
@@ -44,13 +54,8 @@ static const u32_t colors[] = {
     0x80ff20,
     0x2080ff,
     0x8020ff,
-    0xff0000,
-    0x00ff00,
-    0x0000ff
 };
 
-static task_timer lamp_timer;
-static task *lamp_task;
 static bool lamp_enabled = FALSE;
 static bool lamp_disabling = FALSE;
 static u16_t light = 0xff;
@@ -61,6 +66,7 @@ static u32_t lst_color = 0;
 static u32_t cur_color = 0;
 static u8_t factor = 0;
 static volatile bool lamp_bus_bsy = FALSE;
+static volatile bool lamp_dirty = FALSE;
 
 static u8_t lerp(u8_t a, u8_t b, u8_t f) {
   u32_t aa = a, bb = b, ff = f;
@@ -81,59 +87,67 @@ static u32_t gamma_col(u32_t col) {
   return (r<<16) | (g<<8) | b;
 }
 
-static void lamp_cb_irq(bool error) {
-  lamp_bus_bsy = FALSE;
-  APP_release(CLAIM_SWP);
-}
-
-#define DELTA 16
-static void lamp_regulate(void) {
-  if (factor < 0x100 - DELTA) {
-    factor += DELTA;
-    cur_color = lerp_col(src_color, dst_color, factor);
-  } else {
-    factor = 0;
-    cur_color = dst_color;
-    src_color = dst_color;
-    TASK_stop_timer(&lamp_timer);
-    if (lamp_disabling) {
-      lamp_disabling = FALSE;
-      APP_release(CLAIM_LMP);
-      print("lamp off\n");
-    }
-  }
+static void lamp_output(void) {
   if (!lamp_bus_bsy) {
     lamp_bus_bsy = TRUE;
     int i;
     u32_t col = gamma_col(lerp_col(0, cur_color, light));
-    print("lamp col %06x (%06x->%06x->%06x/%02x : %02x)\n", col, src_color, cur_color, dst_color, factor, light);
+    //print("lamp col %06x (%06x->%06x->%06x/%02x : %02x)\n", col, src_color, cur_color, dst_color, factor, light);
     for (i = 0; i < WS2812B_NBR_OF_LEDS; i++) {
       WS2812B_STM32F1_set(col);
     }
     APP_claim(CLAIM_SWP);
     WS2812B_STM32F1_output();
+  } else {
+    lamp_dirty = TRUE;
+  }
+}
+
+static bool lamp_regulate(void) {
+  bool res;
+  if (factor < 0x100 - FACTOR_DELTA) {
+    factor += FACTOR_DELTA;
+    cur_color = lerp_col(src_color, dst_color, factor);
+    res = TRUE;
+  } else {
+    factor = 0;
+    cur_color = dst_color;
+    src_color = dst_color;
+    if (lamp_disabling) {
+      lamp_disabling = FALSE;
+      APP_release(CLAIM_LMP);
+      print("lamp off\n");
+    }
+    res = FALSE;
+  }
+  if (res) lamp_output();
+  return res;
+}
+
+static void lamp_cb_irq(bool error) {
+  lamp_bus_bsy = FALSE;
+  APP_release(CLAIM_SWP);
+  if (lamp_dirty) {
+    lamp_dirty = FALSE;
+    print("lamp dirty\n");
+    lamp_output();
+  } else {
+    lamp_regulate();
   }
 }
 
 static void lamp_update(void) {
-  TASK_stop_timer(&lamp_timer);
-  TASK_start_timer(lamp_task, &lamp_timer, 0, NULL, 40, 40, "lamp");
-}
-
-static void lamp(u32_t a, void *p) {
   lamp_regulate();
 }
 
 void LAMP_init(void) {
   WS2812B_STM32F1_init(lamp_cb_irq);
-  lamp_task = TASK_create(lamp, TASK_STATIC);
   lst_color = 0x807040;
   src_color = 0;
   dst_color = 0;
   cur_color = 0;
   light = 0xf0;
   factor = 0;
-  ASSERT(lamp_task);
 }
 
 void LAMP_enable(bool ena) {
@@ -160,13 +174,17 @@ void LAMP_enable(bool ena) {
   }
 }
 
+bool LAMP_on(void) {
+  return lamp_enabled && !lamp_disabling;
+}
+
 void LAMP_cycle_delta(s16_t dcycle) {
   const u8_t colcount = sizeof(colors)/sizeof(colors[0]);
   cycle += dcycle;
   cycle %= (colcount<<8) | 0xff;
   src_color = cur_color;
   dst_color = lerp_col(colors[cycle>>8], colors[((cycle>>8)+1)%colcount], cycle & 0xff);
-  factor = 0xff-DELTA;
+  factor = 0;
   lamp_update();
 }
 
@@ -174,7 +192,7 @@ void LAMP_light_delta(s8_t dlight) {
   light += dlight;
   light = MAX(light, 0x20);
   light = MIN(light, 0xf0);
-  factor = 0xff-DELTA;
+  factor = 0;
   lamp_update();
 }
 

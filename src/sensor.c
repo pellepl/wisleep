@@ -85,7 +85,7 @@ static adxl_cfg acc_cfg = {
     .freefall_thresh = 7, //*62.5mg
     .freefall_time = 40, //*5ms
 
-    .int_ena = ADXL345_INT_SINGLE_TAP|ADXL345_INT_DOUBLE_TAP|ADXL345_INT_ACTIVITY|ADXL345_INT_INACTIVITY|ADXL345_INT_FREE_FALL,
+    .int_ena = ADXL345_INT_SINGLE_TAP|ADXL345_INT_DOUBLE_TAP|ADXL345_INT_ACTIVITY|/*ADXL345_INT_INACTIVITY|*/ADXL345_INT_FREE_FALL,
     .int_map = 0b00000000,
 
     .format_int_inv = FALSE,
