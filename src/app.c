@@ -356,13 +356,11 @@ static s32_t cli_info(u32_t argc) {
       CONFIG_RTC_PRESCALER,
       CONFIG_RTC_CLOCK_HZ/CONFIG_RTC_PRESCALER
       );
-  u64_t rtccnt = RTC_get_tick();
-  u64_t rtcalm = RTC_get_alarm_tick();
 
   print(
-      "RTCCNT:%016x\n"
-      "RTCALR:%016x\n",
-      rtccnt, rtcalm);
+      "RTCCNT:%016llx\n"
+      "RTCALR:%016llx\n",
+      RTC_get_tick(), RTC_get_alarm_tick());
   return CLI_OK;
 }
 
