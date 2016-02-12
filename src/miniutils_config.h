@@ -12,6 +12,7 @@
 #include "uart_driver.h"
 
 #define MINIUTILS_PRINT_FLOAT
+#define MINIUTILS_PRINT_LONGLONG
 
 #define PUTC(p, c)  \
   if ((int)(p) < 256) \

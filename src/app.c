@@ -126,7 +126,7 @@ static void app_spin(void) {
     IF_DBG(D_APP, D_DEBUG) {
       rtc_datetime dt;
       RTC_get_date_time(&dt);
-      DBG(D_APP, D_DEBUG, "%04i-%02i-%02i %02i:%02i:%02i.%03i %08x %08x\n",
+      DBG(D_APP, D_DEBUG, "%04i-%02i-%02i %02i:%02i:%02i.%03i %016llx\n",
           dt.date.year,
           dt.date.month + 1,
           dt.date.month_day,
@@ -134,7 +134,7 @@ static void app_spin(void) {
           dt.time.minute,
           dt.time.second,
           dt.time.millisecond,
-          (u32_t)((cur_tick)>>32), (u32_t)(cur_tick)
+          cur_tick
           );
     }
 
@@ -164,8 +164,8 @@ static void app_spin(void) {
     } else {
       // wake us at timer value
       RTC_set_alarm_tick(wu_tick);
-      DBG(D_APP, D_DEBUG, "RTC alarm @ %08x %08x from timer %s\n",
-          (u32_t)(wu_tick>>32),(u32_t)(wu_tick), timer->name);
+      DBG(D_APP, D_DEBUG, "RTC alarm @ %016llx from timer %s\n",
+          wu_tick, timer->name);
     }
 
     if (cpu_claims || (!no_wakeup && diff_tick < RTC_MS_TO_TICK(APP_PREVENT_SLEEP_IF_LESS_MS))) {
@@ -360,11 +360,9 @@ static s32_t cli_info(u32_t argc) {
   u64_t rtcalm = RTC_get_alarm_tick();
 
   print(
-      "RTCCNT:%08x%08x\n"
-      "RTCALR:%08x%08x\n",
-      (u32_t)(rtccnt>>32),(u32_t)rtccnt,
-      (u32_t)(rtcalm>>32),(u32_t)rtcalm
-      );
+      "RTCCNT:%016x\n"
+      "RTCALR:%016x\n",
+      rtccnt, rtcalm);
   return CLI_OK;
 }
 
