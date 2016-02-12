@@ -296,7 +296,7 @@ void APP_report_activity(bool activity, bool inactivity, bool tap, bool doubleta
 }
 
 void APP_report_temperature(float temp) {
-  print("temperature %i.%i°C\n", (int)(temp), (int)((temp - (int)temp)* 10.0));
+  print("temperature %.2f°C\n", temp);
 }
 
 void APP_report_data(

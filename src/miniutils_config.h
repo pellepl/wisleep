@@ -11,6 +11,8 @@
 #include "system.h"
 #include "uart_driver.h"
 
+#define MINIUTILS_PRINT_FLOAT
+
 #define PUTC(p, c)  \
   if ((int)(p) < 256) \
     UART_put_char(_UART((int)(p)), (c)); \
