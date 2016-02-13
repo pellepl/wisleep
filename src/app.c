@@ -25,13 +25,16 @@ volatile bool cli_rd;
 static task_timer heartbeat_timer;
 static task_timer temp_timer;
 static task *temp_task;
+static u64_t sensor_idle_tick = 0;
+#ifdef DETECT_UART
 static task_timer cli_tmo_timer;
 static task *cli_tmo_task;
 static bool was_uart_connected = FALSE;
 static u64_t cli_tmo_last_time = 0;
 static bool cli_claimed = FALSE;
-static u64_t sensor_idle_tick = 0;
+#endif
 
+#ifdef DETECT_UART
 static void app_cli_claim(void) {
   APP_claim(CLAIM_CLI);
   cli_claimed = TRUE;
@@ -54,16 +57,6 @@ static bool app_detect_uart(void) {
   return res;
 }
 
-static void cli_task_on_input(u32_t len, void *p) {
-  u8_t io = (u8_t)((u32_t)p);
-  while (IO_rx_available(io)) {
-    u32_t rlen = IO_get_buf(io, cli_buf, MIN(IO_rx_available(io), sizeof(cli_buf)));
-    cli_recv((char *)cli_buf, rlen);
-  }
-  cli_rd = FALSE;
-  cli_tmo_last_time = RTC_get_tick();
-}
-
 static void cli_tmo(u32_t a, void *p) {
   if (cli_claimed) {
     u64_t tick_now = RTC_get_tick();
@@ -72,6 +65,20 @@ static void cli_tmo(u32_t a, void *p) {
     }
   }
 }
+#endif
+
+static void cli_task_on_input(u32_t len, void *p) {
+  u8_t io = (u8_t)((u32_t)p);
+  while (IO_rx_available(io)) {
+    u32_t rlen = IO_get_buf(io, cli_buf, MIN(IO_rx_available(io), sizeof(cli_buf)));
+    cli_recv((char *)cli_buf, rlen);
+  }
+  cli_rd = FALSE;
+#ifdef DETECT_UART
+  cli_tmo_last_time = RTC_get_tick();
+#endif
+}
+
 
 static void cli_rx_avail_irq(u8_t io, void *arg, u16_t available) {
   if (!cli_rd) {
@@ -86,12 +93,14 @@ static void heartbeat(u32_t ignore, void *ignore_more) {
 
   WDOG_feed();
 
+#ifdef DETECT_UART
   bool is_uart_connected = app_detect_uart();
   if (is_uart_connected && !was_uart_connected && !cli_claimed) {
     DBG(D_APP, D_DEBUG, "UART reconnected\n");
     app_cli_claim();
   }
   was_uart_connected = is_uart_connected;
+#endif
 
   gpio_enable(PIN_LED);
 }
@@ -239,12 +248,14 @@ void APP_init(void) {
   temp_task = TASK_create(read_temp, TASK_STATIC);
   TASK_start_timer(temp_task, &temp_timer, 0, 0, 1000, APP_TEMPERATURE_MS, "temp");
 
+#ifdef DETECT_UART
   cli_tmo_task = TASK_create(cli_tmo, TASK_STATIC);
   if (app_detect_uart()) {
     app_cli_claim();
   } else {
     cli_tmo_last_time = 0;
   }
+#endif
 
   cli_rd = FALSE;
   IO_set_callback(IOSTD, cli_rx_avail_irq, NULL);
