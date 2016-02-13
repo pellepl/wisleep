@@ -1,3 +1,6 @@
 [submodule "generic_embedded"]
 	path = generic_embedded
 	url = https://github.com/pellepl/generic_embedded.git
+[submodule "esp-open-rtos"]
+	path = esp-open-rtos
+	url = https://github.com/SuperHouse/esp-open-rtos.git

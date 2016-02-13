@@ -1,3 +1,5 @@
+STM32F1
+=======
 PA0	GPIO	ACC_INT1	
 PA2	USART2_TX	DEBUG
 PA3	USART2_RX	DEBUG
@@ -16,3 +18,13 @@ PB11	I2C2_SDA	PERIPHERAL
 PB15	SPI2_MOSI	LED WS2812B
 
 PC13	GPIO		LED
+
+
+
+ESP8266
+=======
+GPIO0	0 = uart flash  /  1 = flash boot
+GPIO2	1 (bootloader)
+GPIO15	0 (bootloader)
+RES		1
+CHIP_EN	1
