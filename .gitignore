@@ -1,5 +1,4 @@
 /build
-/build_sec
 build-number.txt
 .project
 .settings
@@ -10,4 +9,6 @@ build-number.txt
 config_header.h
 *~
 _stm32flash.script
+src/esp8266/build
+src/esp8266/firmware
 
