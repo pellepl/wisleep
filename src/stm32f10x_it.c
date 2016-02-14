@@ -103,9 +103,9 @@ void DebugMon_Handler(void)
 #ifdef CONFIG_UART1
 void USART1_IRQHandler(void)
 {
-  TRACE_IRQ_ENTER(USART1_IRQn);
-  UART_irq(&__uart_vec[1]);
-  TRACE_IRQ_EXIT(USART1_IRQn);
+  //TRACE_IRQ_ENTER(USART1_IRQn);
+  UART_irq(&__uart_vec[0]);
+  //TRACE_IRQ_EXIT(USART1_IRQn);
 }
 #endif
 
@@ -113,7 +113,7 @@ void USART1_IRQHandler(void)
 void USART2_IRQHandler(void)
 {
   //TRACE_IRQ_ENTER(USART2_IRQn);
-  UART_irq(&__uart_vec[0]);
+  UART_irq(&__uart_vec[1]);
   //TRACE_IRQ_EXIT(USART2_IRQn);
 }
 #endif

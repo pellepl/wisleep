@@ -109,6 +109,12 @@ static void NVIC_config(void)
   NVIC_EnableIRQ(DMA1_Channel5_IRQn);
 }
 
+static void UART1_config() {
+#ifdef CONFIG_UART1
+  gpio_config(PORTA, PIN9, CLK_50MHZ, AF, AF0, PUSHPULL, NOPULL);
+  gpio_config(PORTA, PIN10, CLK_50MHZ, IN, AF0, OPENDRAIN, NOPULL);
+#endif
+}
 static void UART2_config() {
 #ifdef CONFIG_UART2
   gpio_config(PORTA, PIN2, CLK_50MHZ, AF, AF0, PUSHPULL, NOPULL);
@@ -282,6 +288,7 @@ void PROC_periph_init() {
 
   SPI_config();
   I2C_config();
+  UART1_config();
   UART2_config();
 }
 

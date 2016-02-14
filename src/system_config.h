@@ -21,8 +21,9 @@
 
 
 // enable uart
+#define CONFIG_UART1
 #define CONFIG_UART2
-#define CONFIG_UART_CNT   1 // update according to enabled uarts
+#define CONFIG_UART_CNT   2 // update according to enabled uarts
 
 #define CONFIG_SPI1
 
@@ -58,6 +59,11 @@
 #define UART2_GPIO_PORT       GPIOA
 #define UART2_GPIO_RX         GPIO_Pin_3
 #define UART2_GPIO_TX         GPIO_Pin_2
+#endif
+#ifdef CONFIG_UART1
+#define UART1_GPIO_PORT       GPIOA
+#define UART1_GPIO_RX         GPIO_Pin_10
+#define UART1_GPIO_TX         GPIO_Pin_9
 #endif
 
 /** SPI **/
@@ -159,18 +165,22 @@ typedef u16_t system_counter_type;
 
 /** UART **/
 
-#define UARTSTDIN       0
-#define UARTSTDOUT      0
+#define UARTSTDIN       1
+#define UARTSTDOUT      1
+#define UARTWIFIIN      0
+#define UARTWIFIOUT     0
 
 #define UART2_SPEED 460800
+#define UART1_SPEED 921600
 
 #define USE_COLOR_CODING
 
 /** IO **/
-#define CONFIG_IO_MAX   1
+#define CONFIG_IO_MAX   2
 
-#define IOSTD        0
+#define IOSTD        1
 #define IODBG        IOSTD
+#define IOWIFI       0
 
 /** MATH **/
 
