@@ -35,7 +35,7 @@ int main(void) {
   PROC_base_init();
   SYS_init();
   UART_init();
-  UART_assure_tx(_UART(0), TRUE);
+  UART_assure_tx(_UART(UARTSTDOUT), TRUE);
   PROC_periph_init();
   exit_critical();
 
