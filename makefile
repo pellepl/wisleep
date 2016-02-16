@@ -112,7 +112,12 @@ CFILES 		+= processor.c
 CFILES 		+= timer.c
 
 CFILES		+= app.c sensor.c lamp.c
-CFILES		+= ws2812b_spi_stm32f1.c
+CFILES		+= ws2812b_spi_stm32f1.c app_wifi.c
+
+protocoldir = ${sourcedir}/protocol
+CPATH		+= ${protocoldir}
+INC 		+= -I${protocoldir}
+CFILES		+= protocol.c
 
 # stm32 lib files
 #SPATH	+= ${stmdriverdir}/src ${stmcmsisdir} ${stmcmsisdir}/startup/gcc_ride7

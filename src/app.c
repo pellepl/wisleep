@@ -17,6 +17,7 @@
 #include "rtc.h"
 #include "sensor.h"
 #include "lamp.h"
+#include "protocol.h"
 #include <stdarg.h>
 
 static volatile u8_t cpu_claims;
@@ -264,6 +265,8 @@ void APP_init(void) {
   SENS_enter_active();
 
   LAMP_init();
+
+  WB_init();
 
   app_spin();
 }

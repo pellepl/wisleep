@@ -81,6 +81,10 @@ static void NVIC_config(void)
   NVIC_SetPriority(USART2_IRQn, NVIC_EncodePriority(prioGrp, 7, 0));
   NVIC_EnableIRQ(USART2_IRQn);
 #endif
+#ifdef CONFIG_UART1
+  NVIC_SetPriority(USART1_IRQn, NVIC_EncodePriority(prioGrp, 7, 0));
+  NVIC_EnableIRQ(USART1_IRQn);
+#endif
 
 #ifdef CONFIG_SPI
   // Config & enable the SPI-DMA interrupt

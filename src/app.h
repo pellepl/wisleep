@@ -45,4 +45,6 @@ void APP_report_data(
     s16_t mx, s16_t my, s16_t mz,
     s16_t gx, s16_t gy, s16_t gz);
 
+void WB_init(void);
+
 #endif /* APP_H_ */
