@@ -10,6 +10,8 @@
 #include "io.h"
 #include "taskq.h"
 
+static volatile bool com_uart_rd;
+
 static u8_t rx_buf[768];
 static pcomm com;
 static task_timer com_timer;
@@ -59,17 +61,26 @@ static void rx_pkt(u32_t a, void *p) {
 
 }
 
-static void com_rx_phy(u8_t io, void *arg, u16_t available) {
+static void com_task_on_input(u32_t io, void *p) {
   while (IO_rx_available(io)) {
     u8_t chunk[32];
-    u16_t len = MIN(IO_rx_available(io), sizeof(chunk));
-    IO_get_buf(io, chunk, len);
-    pcomm_report_rx_buf(&com, chunk, len);
+    u32_t rlen = IO_get_buf(io, chunk, MIN(IO_rx_available(io), sizeof(chunk)));
+    pcomm_report_rx_buf(&com, chunk, rlen);
+  }
+  com_uart_rd = FALSE;
+}
+
+static void com_rx_avail_irq(u8_t io, void *arg, u16_t available) {
+  if (!com_uart_rd) {
+    task *t = TASK_create(com_task_on_input, 0);
+    TASK_run(t, io, NULL);
+    com_uart_rd = TRUE;
   }
 }
 
 void WB_init(void) {
   IO_assure_tx(IOWIFI, TRUE);
+  com_uart_rd = FALSE;
   UART_config(
       _UART(UARTWIFIIN),
       921600,
@@ -90,5 +101,5 @@ void WB_init(void) {
       .timeout_fn = com_impl_timeout
   };
   pcomm_init(&com, &cfg, rx_buf);
-  IO_set_callback(IOWIFI, com_rx_phy, NULL);
+  IO_set_callback(IOWIFI, com_rx_avail_irq, NULL);
 }
