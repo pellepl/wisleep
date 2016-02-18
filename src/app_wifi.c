@@ -6,9 +6,10 @@
  */
 
 #include "system.h"
-#include "protocol.h"
 #include "io.h"
 #include "taskq.h"
+
+#include "umac.h"
 
 static volatile bool um_uart_rd;
 

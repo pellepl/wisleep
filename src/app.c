@@ -17,7 +17,6 @@
 #include "rtc.h"
 #include "sensor.h"
 #include "lamp.h"
-#include "protocol.h"
 #include <stdarg.h>
 
 static volatile u8_t cpu_claims;

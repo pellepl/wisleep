@@ -1,11 +1,11 @@
 /*
- * protocol.c
+ * umac.c
  *
  *  Created on: Feb 15, 2016
  *      Author: petera
  */
 
-#include "protocol.h"
+#include "umac.h"
 
 #define UMAC_INIT_CRC      0xffff
 

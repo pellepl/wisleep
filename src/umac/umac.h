@@ -1,5 +1,7 @@
 /*
- * protocol.h
+ * umac.h
+ *
+ * micro mac
  *
  * Simple protocol stack for transmitting/receiving packets, sort of MAC-like.
  * Packets can either be synchronized (needing an ack) or unsynchronized (not needing ack).
@@ -15,8 +17,8 @@
  *      Author: petera
  */
 
-#ifndef _PROTOCOL_H_
-#define _PROTOCOL_H_
+#ifndef _UMAC_H_
+#define _UMAC_H_
 
 /*
   DATA LINK FORMAT
@@ -52,7 +54,7 @@
 
  */
 
-#include <protocol_cfg.h>
+#include "umac_cfg.h"
 
 #ifndef CFG_UMAC_DBG
 #define CFG_UMAC_DBG(...)
@@ -192,4 +194,4 @@ void umac_report_rx_byte(umac *u, uint8_t c);
  */
 void umac_report_rx_buf(umac *u, uint8_t *buf, uint16_t len);
 
-#endif /* _PROTOCOL_H_ */
+#endif /* _UMAC_H_ */
