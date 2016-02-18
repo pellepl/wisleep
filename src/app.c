@@ -151,7 +151,7 @@ static void app_spin(void) {
     while (TASK_tick());
 
     // get nearest timer
-    time wakeup_ms;
+    sys_time wakeup_ms;
     volatile u64_t wu_tick = (u64_t)(-1ULL);
     task_timer *timer;
     s32_t no_wakeup = TASK_next_wakeup_ms(&wakeup_ms, &timer);
