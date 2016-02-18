@@ -1,7 +1,7 @@
 /*
  * protocol.h
  *
- * Simple protocol stack for transmitting/receiving packets, ~MAC parts.
+ * Simple protocol stack for transmitting/receiving packets, sort of MAC-like.
  * Packets can either be synchronized (needing an ack) or unsynchronized (not needing ack).
  * The payload length can vary from 0 to 768 bytes.
  *
@@ -19,7 +19,7 @@
 #define _PROTOCOL_H_
 
 /*
-  PHYSICAL PROTOCOL
+  DATA LINK FORMAT
     PKT header
     8 bits : 0x5a       preamble
     2 bits : 0,1,2,3    0:PKT_NREQ  1:PKT_REQ  2:ACK  3:NACK
@@ -54,142 +54,142 @@
 
 #include <protocol_cfg.h>
 
-#ifndef CFG_PCOMM_DBG
-#define CFG_PCOMM_DBG(...)
+#ifndef CFG_UMAC_DBG
+#define CFG_UMAC_DBG(...)
 #endif
 
-#ifndef CFG_PCOMM_RETRIES
-#define CFG_PCOMM_RETRIES             10
+#ifndef CFG_UMAC_RETRIES
+#define CFG_UMAC_RETRIES             10
 #endif
 
-#ifndef CFG_PCOMM_RETRY_DELTA
-#define CFG_PCOMM_RETRY_DELTA         40
+#ifndef CFG_UMAC_RETRY_DELTA
+#define CFG_UMAC_RETRY_DELTA         40
 #endif
 
-#ifndef CFG_PCOMM_RX_TIMEOUT
-#define CFG_PCOMM_RX_TIMEOUT          2*CFG_PCOMM_RETRY_DELTA*CFG_PCOMM_RETRIES
+#ifndef CFG_UMAC_RX_TIMEOUT
+#define CFG_UMAC_RX_TIMEOUT          2*CFG_UMAC_RETRY_DELTA*CFG_UMAC_RETRIES
 #endif
 
-#ifndef CFG_PCOMM_TICK_TYPE
-#define CFG_PCOMM_TICK_TYPE           uint32_t
+#ifndef CFG_UMAC_TICK_TYPE
+#define CFG_UMAC_TICK_TYPE           uint32_t
 #endif
 
-#define PCOMM_PREAMBLE                0x5a
+#define UMAC_PREAMBLE                0x5a
 
-#define PCOMM_NACK_ERR_NOT_PREAMBLE   0x01
-#define PCOMM_NACK_ERR_BAD_CRC        0x02
-#define PCOMM_NACK_ERR_RX_TIMEOUT     0x03
-#define PCOMM_NACK_ERR_NOT_READY      0x04
+#define UMAC_NACK_ERR_NOT_PREAMBLE   0x01
+#define UMAC_NACK_ERR_BAD_CRC        0x02
+#define UMAC_NACK_ERR_RX_TIMEOUT     0x03
+#define UMAC_NACK_ERR_NOT_READY      0x04
 
-typedef CFG_PCOMM_TICK_TYPE ptick;
+typedef CFG_UMAC_TICK_TYPE umtick;
 
 typedef enum {
-  PCOMM_PKT_NREQ_ACK = 0,
-  PCOMM_PKT_REQ_ACK,
-  PCOMM_PKT_ACK,
-  PCOMM_PKT_NACK
-} pcomm_pkt_type;
+  UMAC_PKT_NREQ_ACK = 0,
+  UMAC_PKT_REQ_ACK,
+  UMAC_PKT_ACK,
+  UMAC_PKT_NACK
+} umac_pkt_type;
 
 typedef enum {
-  PST_RX_EXP_PREAMBLE = 0,
-  PST_RX_NOT_PREAMBLE,
-  PST_RX_EXP_HDR_HI,
-  PST_RX_EXP_HDR_LO,
-  PST_RX_DATA,
-  PST_RX_CRC_HI,
-  PST_RX_CRC_LO,
-} pcomm_rx_state;
+  UMST_RX_EXP_PREAMBLE = 0,
+  UMST_RX_NOT_PREAMBLE,
+  UMST_RX_EXP_HDR_HI,
+  UMST_RX_EXP_HDR_LO,
+  UMST_RX_DATA,
+  UMST_RX_CRC_HI,
+  UMST_RX_CRC_LO,
+} umac_rx_state;
 
 typedef struct {
-  pcomm_pkt_type pkt_type;
+  umac_pkt_type pkt_type;
   uint8_t seqno;
   uint8_t *data;
   uint16_t length;
   uint16_t crc;
-} pcomm_pkt;
+} umac_pkt;
 
-typedef void (* pcomm_request_future_tick)(ptick delta_tick);
-typedef void (* pcomm_cancel_future_tick)(void);
-typedef ptick (* pcomm_now_tick)(void);
-typedef void (* pcomm_tx_byte)(uint8_t c);
-typedef void (* pcomm_tx_buf)(uint8_t *c, uint16_t len);
-typedef void (* pcomm_rx_pkt)(pcomm_pkt *pkt);
-typedef void (* pcomm_tx_pkt_acked)(uint8_t seqno, uint8_t *data, uint16_t len);
-typedef void (* pcomm_timeout)(pcomm_pkt *pkt);
+typedef void (* umac_request_future_tick)(umtick delta_tick);
+typedef void (* umac_cancel_future_tick)(void);
+typedef umtick (* umac_now_tick)(void);
+typedef void (* umac_tx_byte)(uint8_t c);
+typedef void (* umac_tx_buf)(uint8_t *c, uint16_t len);
+typedef void (* umac_rx_pkt)(umac_pkt *pkt);
+typedef void (* umac_tx_pkt_acked)(uint8_t seqno, uint8_t *data, uint16_t len);
+typedef void (* umac_timeout)(umac_pkt *pkt);
 
 typedef struct {
-  /** Requests that pcomm_tick is to be called within given ticks */
-  pcomm_request_future_tick timer_fn;
-  /** Cancel any previous request to call pcomm_tick */
-  pcomm_cancel_future_tick cancel_timer_fn;
+  /** Requests that umac_tick is to be called within given ticks */
+  umac_request_future_tick timer_fn;
+  /** Cancel any previous request to call umac_tick */
+  umac_cancel_future_tick cancel_timer_fn;
   /** Returns current system tick */
-  pcomm_now_tick now_fn;
+  umac_now_tick now_fn;
   /** Transmits one byte over the PHY layer */
-  pcomm_tx_byte tx_byte_fn;
+  umac_tx_byte tx_byte_fn;
   /** Transmits a buffer over the PHY layer */
-  pcomm_tx_buf tx_buf_fn;
+  umac_tx_buf tx_buf_fn;
   /** Called when a packet is received */
-  pcomm_rx_pkt rx_pkt_fn;
+  umac_rx_pkt rx_pkt_fn;
   /** Called when a synchronous packet is acked from other side */
-  pcomm_tx_pkt_acked rx_pkt_ack_fn;
+  umac_tx_pkt_acked rx_pkt_ack_fn;
   /** Called if a synchronous packet is not acked within timeout */
-  pcomm_timeout timeout_fn;
-} pcomm_cfg;
+  umac_timeout timeout_fn;
+} umac_cfg;
 
 typedef struct {
-  pcomm_cfg cfg;
-  pcomm_rx_state rx_state;
+  umac_cfg cfg;
+  umac_rx_state rx_state;
   uint8_t tmp[8];
 
-  pcomm_pkt rx_pkt;
+  umac_pkt rx_pkt;
 
   uint16_t rx_data_cnt;
   uint16_t rx_local_crc;
   uint8_t rx_user_acked;
   uint8_t tx_seqno;
 
-  pcomm_pkt tx_pkt;
+  umac_pkt tx_pkt;
   uint8_t await_ack;
   uint8_t retry_ctr;
 
   uint8_t timer_enabled;
   uint8_t timer_ack_enabled;
-  ptick timer_ack_delta;
-  ptick timer_ack_start_tick;
+  umtick timer_ack_delta;
+  umtick timer_ack_start_tick;
   uint8_t timer_rx_enabled;
-  ptick timer_rx_delta;
-  ptick timer_rx_start_tick;
-} pcomm;
+  umtick timer_rx_delta;
+  umtick timer_rx_start_tick;
+} umac;
 
 /**
  * Initiates protocol stack with given configuration and
  * given rx buffer. The buffer should be 768 bytes.
  */
-void pcomm_init(pcomm *p, pcomm_cfg *cfg, uint8_t *rx_buffer);
+void umac_init(umac *u, umac_cfg *cfg, uint8_t *rx_buffer);
 /**
- * Call pcomm_tick when a requested timer times out. See
- * pcomm_request_future_tick timer_fn in config struct.
+ * Call umac_tick when a requested timer times out. See
+ * umac_request_future_tick timer_fn in config struct.
  */
-void pcomm_tick(pcomm *p);
+void umac_tick(umac *u);
 /**
  * Transmits a packet.
  */
-int pcomm_tx_pkt(pcomm *p, uint8_t ack, uint8_t *buf, uint16_t len);
+int umac_tx_pkt(umac *u, uint8_t ack, uint8_t *buf, uint16_t len);
 /**
- * When a synchronous packet is received, pcomm_rx_pkt rx_pkt_fn
+ * When a synchronous packet is received, umac_rx_pkt rx_pkt_fn
  * in config struct is called. In this call, user may ack with
  * piggybacked data if wanted. If not, the stack autoacks with an
  * empty ack.
  */
-int pcomm_tx_reply_ack(pcomm *p,  uint8_t *buf, uint16_t len);
+int umac_tx_reply_ack(umac *u,  uint8_t *buf, uint16_t len);
 
 /**
  * Report to stack that a byte was received from PHY.
  */
-void pcomm_report_rx_byte(pcomm *p, uint8_t c);
+void umac_report_rx_byte(umac *u, uint8_t c);
 /**
  * Report to stack that a buffer was received from PHY.
  */
-void pcomm_report_rx_buf(pcomm *p, uint8_t *buf, uint16_t len);
+void umac_report_rx_buf(umac *u, uint8_t *buf, uint16_t len);
 
 #endif /* _PROTOCOL_H_ */

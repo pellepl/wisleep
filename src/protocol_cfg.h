@@ -11,10 +11,10 @@
 #include "system.h"
 #include "miniutils.h"
 
-#define CFG_PCOMM_RETRIES             10
-#define CFG_PCOMM_RETRY_DELTA         40
-#define CFG_PCOMM_RX_TIMEOUT          2*CFG_PCOMM_RETRY_DELTA*CFG_PCOMM_RETRIES
-#define CFG_PCOMM_TICK_TYPE           time
-#define CFG_PCOMM_DBG(...) DBG(D_COMM, D_DEBUG, "COMM" __VA_ARGS__ )
+#define CFG_UMAC_RETRIES             10
+#define CFG_UMAC_RETRY_DELTA         40
+#define CFG_UMAC_RX_TIMEOUT          2*CFG_UMAC_RETRY_DELTA*CFG_UMAC_RETRIES
+#define CFG_UMAC_TICK_TYPE           time
+#define CFG_UMAC_DBG(...) DBG(D_COMM, D_DEBUG, "UM " __VA_ARGS__ )
 
 #endif /* _PROTOCOL_CFG_H_ */
