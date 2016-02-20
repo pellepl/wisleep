@@ -16,6 +16,8 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
+#include "espressif/esp_common.h"
+
 #define MAX_ARGC (10)
 
 static void cmd_on(uint32_t argc, char *argv[])
@@ -54,13 +56,48 @@ static void cmd_help(uint32_t argc, char *argv[])
     printf("\nExample:\n");
     printf("  on 0<enter> switches on gpio 0\n");
     printf("  on 0 2 4<enter> switches on gpios 0, 2 and 4\n");
+    printf("\n");
+    printf("chip size %i\n", sdk_flashchip.chip_size);
 }
 
 static void cmd_sleep(uint32_t argc, char *argv[])
 {
     printf("Type away while I take a 2 second nap (ie. let you test the UART HW FIFO\n");
+    printf("Then: %i\n", xTaskGetTickCount());
     vTaskDelay(2000 / portTICK_RATE_MS);
+    printf("Now: %i\n", xTaskGetTickCount());
 }
+
+
+
+
+static struct sdk_scan_config scan_cfg;
+
+static void sdk_scan_done_cb(void *arg, sdk_scan_status_t status) {
+  printf("scan done, status %i\n", status);
+
+  if (status == SCAN_OK) {
+    struct sdk_bss_info *bss_link = (struct sdk_bss_info *)arg;
+    bss_link = (struct sdk_bss_info *)bss_link->next.stqe_next;//ignore first
+
+    while (bss_link != NULL) {
+      printf("ssid:%s  ch%i  rssi:%i\n",
+          bss_link->ssid,
+          bss_link->channel,
+          bss_link->rssi);
+      bss_link = (struct sdk_bss_info *)bss_link->next.stqe_next;
+    }
+  }
+}
+
+static void cmd_ap(uint32_t argc, char *argv[])
+{
+  bool res = sdk_wifi_station_scan(&scan_cfg, sdk_scan_done_cb);
+  printf("scan called, res %i\n", res);
+}
+
+
+
 
 static void handle_command(char *cmd)
 {
@@ -83,11 +120,12 @@ static void handle_command(char *cmd)
         else if (strcmp(argv[0], "on") == 0) cmd_on(argc, argv);
         else if (strcmp(argv[0], "off") == 0) cmd_off(argc, argv);
         else if (strcmp(argv[0], "sleep") == 0) cmd_sleep(argc, argv);
+        else if (strcmp(argv[0], "ap") == 0) cmd_ap(argc, argv);
         else printf("Unknown command %s, try 'help'\n", argv[0]);
     }
 }
 
-static void gpiomon()
+static void uart_task(void *pvParameters)
 {
     char ch;
     char cmd[81];
@@ -110,8 +148,29 @@ static void gpiomon()
     }
 }
 
+static void scan_done2(void *arg, sdk_scan_status_t status)
+
+{
+    printf("scan done with status %i\n", status);
+}
+
+void scan_task(void *pvParameters) {
+    printf("About to start scan\n");
+    if(sdk_wifi_get_opmode() == SOFTAP_MODE) {
+        printf("ap mode can't scan !!!\r\n");
+        return;
+    }
+    while(1) {
+      bool s = sdk_wifi_station_scan(NULL, &scan_done2);
+      printf("Scan call done, status: %i\n", s);
+      vTaskDelay(100000 / portTICK_RATE_MS);
+    }
+}
+
 void user_init(void)
 {
-    uart_set_baud(0, 921600);
-    gpiomon();
+  sdk_wifi_set_opmode(STATION_MODE);
+  uart_set_baud(0, 921600);
+  //xTaskCreate(&scan_task, (signed char *)"scan_task", 512, NULL, 2, NULL);
+  xTaskCreate(&uart_task, (signed char *)"uart_task", 512, NULL, 2, NULL);
 }
