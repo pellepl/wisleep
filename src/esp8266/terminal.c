@@ -15,162 +15,110 @@
 #include <stdio.h>
 #include "FreeRTOS.h"
 #include "task.h"
+#include "timers.h"
 
 #include "espressif/esp_common.h"
 
-#define MAX_ARGC (10)
+#include "../umac/umac.h"
 
-static void cmd_on(uint32_t argc, char *argv[])
-{
-    if (argc >= 2) {
-        for(int i=1; i<argc; i++) {
-            uint8_t gpio_num = atoi(argv[i]);
-            gpio_enable(gpio_num, GPIO_OUTPUT);
-            gpio_write(gpio_num, true);
-            printf("On %d\n", gpio_num);
-        }
-    } else {
-        printf("Error: missing gpio number.\n");
-    }
-}
+static umac um;
+static unsigned char rx_buf[768];
+static const long um_tim_id = 123;
+static xTimerHandle um_tim_hdl;
 
-static void cmd_off(uint32_t argc, char *argv[])
-{
-    if (argc >= 2) {
-        for(int i=1; i<argc; i++) {
-            uint8_t gpio_num = atoi(argv[i]);
-            gpio_enable(gpio_num, GPIO_OUTPUT);
-            gpio_write(gpio_num, false);
-            printf("Off %d\n", gpio_num);
-        }
-    } else {
-        printf("Error: missing gpio number.\n");
-    }
-}
-
-static void cmd_help(uint32_t argc, char *argv[])
-{
-    printf("on <gpio number> [ <gpio number>]+     Set gpio to 1\n");
-    printf("off <gpio number> [ <gpio number>]+    Set gpio to 0\n");
-    printf("sleep                                  Take a nap\n");
-    printf("\nExample:\n");
-    printf("  on 0<enter> switches on gpio 0\n");
-    printf("  on 0 2 4<enter> switches on gpios 0, 2 and 4\n");
-    printf("\n");
-    printf("chip size %i\n", sdk_flashchip.chip_size);
-}
-
-static void cmd_sleep(uint32_t argc, char *argv[])
-{
-    printf("Type away while I take a 2 second nap (ie. let you test the UART HW FIFO\n");
-    printf("Then: %i\n", xTaskGetTickCount());
-    vTaskDelay(2000 / portTICK_RATE_MS);
-    printf("Now: %i\n", xTaskGetTickCount());
-}
-
-
-
-
+#if 0
 static struct sdk_scan_config scan_cfg;
-
 static void sdk_scan_done_cb(void *arg, sdk_scan_status_t status) {
-  printf("scan done, status %i\n", status);
-
   if (status == SCAN_OK) {
-    struct sdk_bss_info *bss_link = (struct sdk_bss_info *)arg;
-    bss_link = (struct sdk_bss_info *)bss_link->next.stqe_next;//ignore first
+    struct sdk_bss_info *bss_link = (struct sdk_bss_info *) arg;
+    bss_link = (struct sdk_bss_info *) bss_link->next.stqe_next; //ignore first
 
     while (bss_link != NULL) {
-      printf("ssid:%s  ch%i  rssi:%i\n",
-          bss_link->ssid,
-          bss_link->channel,
-          bss_link->rssi);
-      bss_link = (struct sdk_bss_info *)bss_link->next.stqe_next;
+//      printf("ssid:%s  ch%i  rssi:%i\n", bss_link->ssid, bss_link->channel,
+//          bss_link->rssi);
+      bss_link = (struct sdk_bss_info *) bss_link->next.stqe_next;
     }
   }
 }
 
-static void cmd_ap(uint32_t argc, char *argv[])
-{
+static void cmd_ap(uint32_t argc, char *argv[]) {
   bool res = sdk_wifi_station_scan(&scan_cfg, sdk_scan_done_cb);
-  printf("scan called, res %i\n", res);
+  (void)res;
+}
+#endif
+
+static void uart_task(void *pvParameters) {
+  unsigned char ch;
+  while (1) {
+    if (read(0, (void*) &ch, 1)) { // 0 is stdin
+      umac_report_rx_byte(&um, ch);
+    }
+  }
+}
+
+void um_tim_cb(xTimerHandle xTimer) {
+  umac_tick(&um);
+}
+
+static void umac_impl_request_future_tick(umtick delta_tick) {
+  xTimerChangePeriod(um_tim_hdl, delta_tick, 0);
+  xTimerReset(um_tim_hdl, 0);
+}
+
+static void umac_impl_cancel_future_tick(void) {
+  xTimerStop(um_tim_hdl, 0);
+}
+
+static void umac_impl_tx_byte(uint8_t c) {
+  uart_putc(0, c);
+}
+
+static void umac_impl_tx_buf(uint8_t *c, uint16_t len) {
+  while (len--) {
+    uart_putc(0, *c++);
+  }
+}
+
+static umtick umac_impl_now_tick(void) {
+  return xTaskGetTickCount();
+}
+
+static void umac_impl_rx_pkt(umac_pkt *pkt) {
+  (void)pkt;
+}
+
+static void umac_impl_rx_pkt_acked(uint8_t seqno, uint8_t *data, uint16_t len) {
+  (void)seqno;
+  (void)data;
+  (void)len;
+}
+
+static void umac_impl_timeout(umac_pkt *pkt) {
+  (void)pkt;
 }
 
 
-
-
-static void handle_command(char *cmd)
-{
-    char *argv[MAX_ARGC];
-    int argc = 1;
-    char *temp, *rover;
-    memset((void*) argv, 0, sizeof(argv));
-    argv[0] = cmd;
-    rover = cmd;
-    // Split string "<command> <argument 1> <argument 2>  ...  <argument N>"
-    // into argv, argc style
-    while(argc < MAX_ARGC && (temp = strstr(rover, " "))) {
-        rover = &(temp[1]);
-        argv[argc++] = rover;
-        *temp = 0;
-    }
-
-    if (strlen(argv[0]) > 0) {
-        if (strcmp(argv[0], "help") == 0) cmd_help(argc, argv);
-        else if (strcmp(argv[0], "on") == 0) cmd_on(argc, argv);
-        else if (strcmp(argv[0], "off") == 0) cmd_off(argc, argv);
-        else if (strcmp(argv[0], "sleep") == 0) cmd_sleep(argc, argv);
-        else if (strcmp(argv[0], "ap") == 0) cmd_ap(argc, argv);
-        else printf("Unknown command %s, try 'help'\n", argv[0]);
-    }
-}
-
-static void uart_task(void *pvParameters)
-{
-    char ch;
-    char cmd[81];
-    int i = 0;
-    printf("\n\n\nWelcome to gpiomon. Type 'help<enter>' for, well, help\n");
-    printf("%% ");
-    while(1) {
-        if (read(0, (void*)&ch, 1)) { // 0 is stdin
-            printf("%c", ch);
-            if (ch == '\n' || ch == '\r') {
-                cmd[i] = 0;
-                i = 0;
-                printf("\n");
-                handle_command((char*) cmd);
-                printf("%% ");
-            } else {
-                if (i < sizeof(cmd)) cmd[i++] = ch;
-            }
-        }
-    }
-}
-
-static void scan_done2(void *arg, sdk_scan_status_t status)
-
-{
-    printf("scan done with status %i\n", status);
-}
-
-void scan_task(void *pvParameters) {
-    printf("About to start scan\n");
-    if(sdk_wifi_get_opmode() == SOFTAP_MODE) {
-        printf("ap mode can't scan !!!\r\n");
-        return;
-    }
-    while(1) {
-      bool s = sdk_wifi_station_scan(NULL, &scan_done2);
-      printf("Scan call done, status: %i\n", s);
-      vTaskDelay(100000 / portTICK_RATE_MS);
-    }
-}
-
-void user_init(void)
-{
+void user_init(void) {
   sdk_wifi_set_opmode(STATION_MODE);
   uart_set_baud(0, 921600);
-  //xTaskCreate(&scan_task, (signed char *)"scan_task", 512, NULL, 2, NULL);
-  xTaskCreate(&uart_task, (signed char *)"uart_task", 512, NULL, 2, NULL);
+
+  umac_cfg um_cfg = {
+      .timer_fn = umac_impl_request_future_tick,
+      .cancel_timer_fn = umac_impl_cancel_future_tick,
+      .now_fn = umac_impl_now_tick,
+      .tx_byte_fn = umac_impl_tx_byte,
+      .tx_buf_fn = umac_impl_tx_buf,
+      .rx_pkt_fn = umac_impl_rx_pkt,
+      .rx_pkt_ack_fn = umac_impl_rx_pkt_acked,
+      .timeout_fn = umac_impl_timeout
+  };
+  umac_init(&um, &um_cfg, rx_buf);
+
+  um_tim_hdl = xTimerCreate(
+      (signed char *)"umac_tim",
+      10,
+      false,
+      (void *)um_tim_id, um_tim_cb);
+
+  xTaskCreate(&uart_task, (signed char * )"uart_task", 512, NULL, 2, NULL);
 }
