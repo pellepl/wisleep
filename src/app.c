@@ -379,9 +379,11 @@ static s32_t cli_info(u32_t argc) {
 
 
 CLI_EXTERN_MENU(common)
+CLI_EXTERN_MENU(wifi)
 
 CLI_MENU_START_MAIN
 CLI_EXTRAMENU(common)
+CLI_SUBMENU(wifi, "wifi", "SUBMENU: wifi module")
 CLI_FUNC("temp", cli_temp, "Reads temperature")
 CLI_FUNC("info", cli_info, "Prints system info")
 CLI_FUNC("help", cli_help, "Prints help")

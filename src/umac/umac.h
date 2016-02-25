@@ -118,6 +118,7 @@ typedef void (* umac_tx_buf)(uint8_t *c, uint16_t len);
 typedef void (* umac_rx_pkt)(umac_pkt *pkt);
 typedef void (* umac_tx_pkt_acked)(uint8_t seqno, uint8_t *data, uint16_t len);
 typedef void (* umac_timeout)(umac_pkt *pkt);
+typedef void (* umac_nonprotocol_data)(uint8_t c);
 
 typedef struct {
   /** Requests that umac_tick is to be called within given ticks */
@@ -136,6 +137,8 @@ typedef struct {
   umac_tx_pkt_acked rx_pkt_ack_fn;
   /** Called if a synchronous packet is not acked within timeout */
   umac_timeout timeout_fn;
+  /** Called if non protocol data is received */
+  umac_nonprotocol_data nonprotocol_data_fn;
 } umac_cfg;
 
 typedef struct {

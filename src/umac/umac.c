@@ -284,14 +284,23 @@ static void _umac_parse_char(umac *u, uint8_t c) {
       u->rx_state = UMST_RX_EXP_HDR_HI;
     } else {
       u->rx_state = UMST_RX_NOT_PREAMBLE;
+      if (u->cfg.nonprotocol_data_fn) {
+        u->cfg.nonprotocol_data_fn(c);
+      }
     }
     break;
   case UMST_RX_NOT_PREAMBLE:
     if (c == UMAC_PREAMBLE) {
+#ifdef CFG_UMAC_NACK_GARBAGE
       _umac_tx_nack(u, UMAC_NACK_ERR_NOT_PREAMBLE, 0x0);
+#endif
       u->rx_pkt.seqno = 0;
       _umac_request_rx_timer(u, CFG_UMAC_RX_TIMEOUT);
       u->rx_state = UMST_RX_EXP_HDR_HI;
+    } else {
+      if (u->cfg.nonprotocol_data_fn) {
+        u->cfg.nonprotocol_data_fn(c);
+      }
     }
     break;
   case UMST_RX_EXP_HDR_HI:

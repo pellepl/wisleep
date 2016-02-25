@@ -13,6 +13,7 @@
 #include <string.h>
 #include <stdio.h>
 
+//#define CFG_UMAC_NACK_GARBAGE
 #define CFG_UMAC_RETRIES              10
 #define CFG_UMAC_RETRY_DELTA          40/portTICK_RATE_MS
 #define CFG_UMAC_RX_TIMEOUT           2*CFG_UMAC_RETRY_DELTA*CFG_UMAC_RETRIES

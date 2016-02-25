@@ -10,10 +10,16 @@
 #include "taskq.h"
 
 #include "umac.h"
+#include "cli.h"
+
 
 static volatile bool um_uart_rd;
 
+static u8_t dbg_buf[64];
+static u8_t dbg_ix = 0;
+static bool dbg_pad = FALSE;
 static u8_t rx_buf[768];
+static u8_t tx_buf[768];
 static umac um;
 static task_timer umac_timer;
 static task *umac_timer_task;
@@ -53,13 +59,44 @@ static void um_impl_timeout(umac_pkt *pkt) {
 
 }
 
+static void um_impl_nonprotocol_data(uint8_t c) {
+  if (c == '\n') {
+    if (!dbg_pad) {
+      print("[ESPDBG] ");
+    }
+    IO_put_buf(IODBG, dbg_buf, dbg_ix);
+    print("\n");
+    dbg_ix = 0;
+    dbg_pad = FALSE;
+    return;
+  }
+  if (dbg_ix >= sizeof(dbg_buf)-1) {
+    if (!dbg_pad) {
+      print("[ESPDBG] ");
+    }
+    IO_put_buf(IODBG, dbg_buf, dbg_ix);
+    dbg_ix = 0;
+    dbg_pad = TRUE;
+  }
+  dbg_buf[dbg_ix++] = c;
+}
+
 static void task_tick(u32_t a, void *p) {
   umac_tick(&um);
 }
 
 static void rx_pkt(u32_t a, void *p) {
   umac_pkt *pkt = (umac_pkt *)p;
-
+  u16_t ix = 0;
+  while (ix < pkt->length) {
+    u8_t *d = &pkt->data[ix];
+    print("%02x:%02x:%02x:%02x:%02x:%02x ",
+        d[0], d[1], d[2], d[3], d[4], d[5]);
+    print("%02x %2i %+3i ", d[38], d[39], (s8_t)d[40]);
+    IO_put_buf(IODBG, &d[6], strlen((char *)&d[6]));
+    print("\n");
+    ix += 6+32+3;
+  }
 }
 
 static void um_task_on_input(u32_t io, void *p) {
@@ -99,8 +136,28 @@ void WB_init(void) {
       .tx_buf_fn = um_impl_tx_buf,
       .rx_pkt_fn = um_impl_rx_pkt,
       .rx_pkt_ack_fn = um_impl_tx_pkt_acked,
-      .timeout_fn = um_impl_timeout
+      .timeout_fn = um_impl_timeout,
+      .nonprotocol_data_fn = um_impl_nonprotocol_data
   };
   umac_init(&um, &cfg, rx_buf);
   IO_set_callback(IOWIFI, um_rx_avail_irq, NULL);
 }
+
+
+static s32_t cli_time(u32_t argc) {
+  tx_buf[0] = 0x00;
+  umac_tx_pkt(&um, TRUE, tx_buf, 1);
+  return CLI_OK;
+}
+
+static s32_t cli_scan(u32_t argc) {
+  tx_buf[0] = 0x01;
+  umac_tx_pkt(&um, TRUE, tx_buf, 1);
+  return CLI_OK;
+}
+
+CLI_MENU_START(wifi)
+CLI_FUNC("time", cli_time, "Send time packet")
+CLI_FUNC("scan", cli_scan, "Scans APs")
+CLI_MENU_END
+
