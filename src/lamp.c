@@ -58,7 +58,7 @@ static const u32_t colors[] = {
 
 static bool lamp_enabled = FALSE;
 static bool lamp_disabling = FALSE;
-static u16_t light = 0xff;
+static u16_t light = 0x3f;
 static u16_t cycle = 0x0000;
 static u32_t src_color = 0;
 static u32_t dst_color = 0;
@@ -154,7 +154,8 @@ void LAMP_init(void) {
   src_color = 0;
   dst_color = 0;
   cur_color = 0;
-  light = 0xf0;
+  cycle = 0x0000;
+  light = 0x30;
   factor = 0;
   lamp_update_task = TASK_create(lamp_task, TASK_STATIC);
 }
