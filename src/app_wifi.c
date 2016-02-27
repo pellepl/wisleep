@@ -17,7 +17,7 @@ static volatile bool um_uart_rd;
 
 static u8_t dbg_buf[64];
 static u8_t dbg_ix = 0;
-static bool dbg_pad = FALSE;
+static bool dbg_add = FALSE;
 static u8_t rx_buf[768];
 static u8_t tx_buf[768];
 static umac um;
@@ -61,22 +61,23 @@ static void um_impl_timeout(umac_pkt *pkt) {
 
 static void um_impl_nonprotocol_data(uint8_t c) {
   if (c == '\n') {
-    if (!dbg_pad) {
+    if (!dbg_add) {
       print("[ESPDBG] ");
     }
     IO_put_buf(IODBG, dbg_buf, dbg_ix);
     print("\n");
     dbg_ix = 0;
-    dbg_pad = FALSE;
+    dbg_add = FALSE;
     return;
   }
+
   if (dbg_ix >= sizeof(dbg_buf)-1) {
-    if (!dbg_pad) {
+    if (!dbg_add) {
       print("[ESPDBG] ");
     }
     IO_put_buf(IODBG, dbg_buf, dbg_ix);
     dbg_ix = 0;
-    dbg_pad = TRUE;
+    dbg_add = TRUE;
   }
   dbg_buf[dbg_ix++] = c;
 }
@@ -88,14 +89,19 @@ static void task_tick(u32_t a, void *p) {
 static void rx_pkt(u32_t a, void *p) {
   umac_pkt *pkt = (umac_pkt *)p;
   u16_t ix = 0;
+  switch (pkt->data[0])  {
+  case 0x01:
   while (ix < pkt->length) {
     u8_t *d = &pkt->data[ix];
     print("%02x:%02x:%02x:%02x:%02x:%02x ",
         d[0], d[1], d[2], d[3], d[4], d[5]);
     print("%02x %2i %+3i ", d[38], d[39], (s8_t)d[40]);
-    IO_put_buf(IODBG, &d[6], strlen((char *)&d[6]));
+    u32_t len = MAX(32, strlen((char *)&d[6]));
+    IO_put_buf(IODBG, &d[6], len);
     print("\n");
     ix += 6+32+3;
+  }
+  break;
   }
 }
 

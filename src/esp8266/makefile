@@ -1,6 +1,6 @@
 PROGRAM=terminal
 
-EXTRA_COMPONENTS=extras/stdin_uart_interrupt
+EXTRA_COMPONENTS=extras/stdin_uart_interrupt extras/dhcpserver
 
 PROGRAM_ROOT=./..
 PROGRAM_SRC_DIR=./..
