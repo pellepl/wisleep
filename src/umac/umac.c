@@ -46,6 +46,12 @@ static void _umac_hal_disable_timer(umac *u) {
   u->timer_enabled = 0;
 }
 
+// increases tx seqno
+static void _umac_inc_tx_seqno(umac *u) {
+  u->tx_seqno++;
+  if (u->tx_seqno > 0xf) u->tx_seqno = 1;
+}
+
 // transmit a NACK with error code
 static void _umac_tx_nack(umac *u, uint8_t err, uint8_t seqno) {
   CFG_UMAC_DBG("RX: NACK seq %x: err %i\n", seqno, err);
@@ -100,7 +106,7 @@ static void _umac_tx_initial(umac *u, umac_pkt *pkt) {
   if (pkt->pkt_type == UMAC_PKT_REQ_ACK) {
     u->retry_ctr = 0;
     u->await_ack = 1;
-    _umac_request_ack_timer(u, CFG_UMAC_RETRY_DELTA);
+    _umac_request_ack_timer(u, CFG_UMAC_RETRY_DELTA(u->retry_ctr));
   }
 }
 
@@ -208,14 +214,14 @@ static void _umac_timer_trig_ack(umac *u) {
     u->retry_ctr++;
     if (u->retry_ctr > CFG_UMAC_RETRIES) {
       CFG_UMAC_DBG("TX: noACK, TMO seq %i\n", u->tx_seqno);
-      u->tx_seqno++;
+      _umac_inc_tx_seqno(u);
       u->retry_ctr = 0;
       u->await_ack = 0;
       u->cfg.timeout_fn(&u->tx_pkt);
     } else {
       CFG_UMAC_DBG("TX: noACK, reTX seq %i, #%i\n", u->tx_seqno, u->retry_ctr);
       _umac_tx(u, &u->tx_pkt);
-      _umac_request_ack_timer(u, CFG_UMAC_RETRY_DELTA);
+      _umac_request_ack_timer(u, CFG_UMAC_RETRY_DELTA(u->retry_ctr));
     }
   }
 }
@@ -235,8 +241,7 @@ static void _umac_trig_rx_pkt(umac *u) {
       CFG_UMAC_DBG("RX: ACK seq %i\n", u->rx_pkt.seqno);
       _umac_cancel_ack_timer(u);
       u->await_ack = 0;
-      u->tx_seqno++;
-      if (u->tx_seqno > 0xf) u->tx_seqno = 1;
+      _umac_inc_tx_seqno(u);
       u->cfg.rx_pkt_ack_fn(u->rx_pkt.seqno, u->rx_pkt.data, u->rx_pkt.length);
     } else {
       CFG_UMAC_DBG("RX: ACK unkn seq %i\n", u->rx_pkt.seqno);
@@ -244,8 +249,8 @@ static void _umac_trig_rx_pkt(umac *u) {
     break;
   case UMAC_PKT_NACK:
     if (u->await_ack && u->tx_seqno == u->rx_pkt.seqno) {
-      if (u->rx_pkt.data[0] != UMAC_NACK_ERR_NOT_READY &&
-          u->rx_pkt.data[0] != UMAC_NACK_ERR_NOT_PREAMBLE) {
+      if (u->rx_pkt.data[0] == UMAC_NACK_ERR_BAD_CRC ||
+          u->rx_pkt.data[0] == UMAC_NACK_ERR_RX_TIMEOUT) {
         CFG_UMAC_DBG("RX: NACK seq %i, err %i, reTX direct\n", u->rx_pkt.seqno, u->rx_pkt.data[0]);
         _umac_cancel_ack_timer(u);
         _umac_tx_initial(u, &u->tx_pkt);
@@ -376,6 +381,10 @@ int umac_tx_pkt(umac *u, uint8_t ack, uint8_t *buf, uint16_t len) {
     CFG_UMAC_DBG("TX: ERR user send sync while BUSY\n");
     return -1; // TODO busy, some error
   }
+  if (len > 769) {
+    CFG_UMAC_DBG("TX: ERR too long\n");
+    return -1;
+  }
   umac_pkt *pkt = &u->tx_pkt;
   pkt->pkt_type = ack ? UMAC_PKT_REQ_ACK : UMAC_PKT_NREQ_ACK;
   pkt->data = buf;
@@ -389,6 +398,10 @@ int umac_tx_reply_ack(umac *u, uint8_t *buf, uint16_t len) {
   if (u->rx_pkt.pkt_type != UMAC_PKT_REQ_ACK) {
     CFG_UMAC_DBG("TX: ERR user send ack wrong state\n");
     return -1; // TODO not within rx call, some error
+  }
+  if (len > 769) {
+    CFG_UMAC_DBG("TX: ERR too long\n");
+    return -1;
   }
   u->rx_user_acked = 1;
   // reuse rx pkt as an ack
