@@ -1,10 +1,3 @@
-/* Serial terminal example
- * UART RX is interrupt driven
- * Implements a simple GPIO terminal for setting and clearing GPIOs
- *
- * This sample code is in the public domain.
- */
-
 #include <stdint.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -20,6 +13,8 @@
 #include "espressif/esp_common.h"
 #include "dhcpserver.h"
 #include "lwip/api.h"
+
+#include "server.h"
 
 #include "../umac/umac.h"
 
@@ -121,48 +116,6 @@ static void umac_impl_timeout(umac_pkt *pkt) {
   (void)pkt;
 }
 
-static void server_task(void *pvParameters)
-{
-  struct netconn *nc = netconn_new (NETCONN_TCP);
-  if(!nc) {
-    printf("Status monitor: Failed to allocate socket.\n");
-    return;
-  }
-  printf("listening on port 80\n");
-  netconn_bind(nc, IP_ADDR_ANY, 80);
-  netconn_listen(nc);
-
-  while(1) {
-    struct netconn *client = NULL;
-    err_t err = netconn_accept(nc, &client);
-
-    if ( err != ERR_OK ) {
-      if(client)
-        netconn_delete(client);
-      continue;
-    }
-
-    printf("connection\n");
-    ip_addr_t client_addr;
-    uint16_t port_ignore;
-    netconn_peer(client, &client_addr, &port_ignore);
-
-    char buf[80];
-    snprintf(buf, sizeof(buf), "Uptime %d seconds\r\n",
-       xTaskGetTickCount()*portTICK_RATE_MS/1000);
-    netconn_write(client, buf, strlen(buf), NETCONN_COPY);
-    snprintf(buf, sizeof(buf), "Free heap %d bytes\r\n", (int)xPortGetFreeHeapSize());
-    netconn_write(client, buf, strlen(buf), NETCONN_COPY);
-    snprintf(buf, sizeof(buf), "Your address is %d.%d.%d.%d\r\n\r\n",
-             ip4_addr1(&client_addr), ip4_addr2(&client_addr),
-             ip4_addr3(&client_addr), ip4_addr4(&client_addr));
-    netconn_write(client, buf, strlen(buf), NETCONN_COPY);
-    netconn_delete(client);
-  }
-}
-
-
-
 void user_init(void) {
   uart_set_baud(0, 921600);
   //sdk_wifi_set_opmode(STATION_MODE);
@@ -221,5 +174,5 @@ void user_init(void) {
       (void *)um_tim_id, um_tim_cb);
 
   xTaskCreate(uart_task, (signed char * )"uart_task", 512, NULL, 2, NULL);
-  xTaskCreate(server_task, (signed char *)"serverTask", 512, NULL, 2, NULL);
+  xTaskCreate(server_task, (signed char *)"server_task", 512, NULL, 2, NULL);
 }

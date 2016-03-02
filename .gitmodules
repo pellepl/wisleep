@@ -4,3 +4,6 @@
 [submodule "esp-open-rtos"]
 	path = esp-open-rtos
 	url = https://github.com/SuperHouse/esp-open-rtos.git
+[submodule "src/uweb"]
+	path = src/uweb
+	url = https://github.com/pellepl/uweb.git
