@@ -11,6 +11,7 @@
 #include "lwip/sockets.h"
 #include "../uweb/src/uweb.h"
 #include "../uweb/src/uweb_http.h"
+#include "octet_spiflash.h"
 
 static uweb_data_stream socket_str, res_str;
 
@@ -41,18 +42,15 @@ static UW_STREAM make_socket_stream(UW_STREAM str, int sockfd) {
 
 
 
-static int32_t nullstr_read(UW_STREAM str, uint8_t *dst, uint32_t len) {
-  return 0;
-}
-static int32_t nullstr_write(UW_STREAM str, uint8_t *src, uint32_t len) {
+static int32_t str_ret0(UW_STREAM str, uint8_t *dst, uint32_t len) {
   return 0;
 }
 static UW_STREAM make_null_stream(UW_STREAM str) {
   str->total_sz = 0;
   str->capacity_sz = 0;
   str->avail_sz = 0;
-  str->read = nullstr_read;
-  str->write = nullstr_write;
+  str->read = str_ret0;
+  str->write = str_ret0;
   return str;
 }
 
@@ -65,29 +63,75 @@ static int32_t charstr_read(UW_STREAM str, uint8_t *dst, uint32_t len) {
   str->user += len;
   return len;
 }
-static int32_t charstr_write(UW_STREAM str, uint8_t *src, uint32_t len) {
-  return 0;
-}
 static UW_STREAM make_char_stream(UW_STREAM str, const char *txt) {
   str->total_sz = strlen(txt);
   str->capacity_sz = 0;
   str->avail_sz = str->total_sz;
   str->read = charstr_read;
-  str->write = charstr_write;
+  str->write = str_ret0;
   str->user = (void *)txt;
+  return str;
+}
+
+#define SPIFSTR_CHUNK_SZ      32 //UWEB_TX_MAX_LEN
+
+static int32_t spifstr_read(UW_STREAM str, uint8_t *dst, uint32_t len) {
+  uint32_t addr = (uint32_t)(intptr_t)str->user;
+  len = str->avail_sz < len ? str->avail_sz : len;
+  len = str->total_sz < len ? str->total_sz : len;
+  (void)octet_spif_read(addr, dst, len);
+  str->total_sz -= len;
+  str->avail_sz = SPIFSTR_CHUNK_SZ < str->total_sz ? SPIFSTR_CHUNK_SZ : str->total_sz;
+  str->user = (void *)(intptr_t)(addr + len);
+  return len;
+}
+static UW_STREAM make_spif_stream(UW_STREAM str, uint32_t addr, uint32_t len) {
+  str->total_sz = len;
+  str->capacity_sz = 0;
+  str->avail_sz = len < SPIFSTR_CHUNK_SZ ? len : SPIFSTR_CHUNK_SZ;
+  str->read = spifstr_read;
+  str->write = str_ret0;
+  str->user = (void *)(intptr_t)addr;
   return str;
 }
 
 
 static const char *TEST = "Holy crap, it works!";
+static char extra_hdrs[128];
 
 static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
-    uweb_http_status *http_status, char *content_type) {
+    uweb_http_status *http_status, char *content_type,
+    char **extra_headers) {
   if (req->chunk_nbr == 0) {
     printf("opening %s\n", &req->resource[1]);
-    if (strcmp(&req->resource[1], "index.html") == 0) {
+
+    if (strcmp(req->resource, "/index.html") == 0 || strlen(req->resource) == 1) {
+      // --- index.html
       make_char_stream(&res_str, TEST);
+
+    } else if (strstr(req->resource, "/spiflash") == req->resource) {
+      // --- read spiflash
+      sprintf(content_type, "application/octet-stream");
+      uint32_t addr = 0;
+      uint32_t len = sdk_flashchip.chip_size;
+      char *addr_ix, *len_ix;
+      if ((addr_ix = strstr(req->resource, "addr="))) {
+        addr = strtol(addr_ix+5, NULL, 0);
+      }
+      if ((len_ix = strstr(req->resource, "len="))) {
+        len = strtol(len_ix+4, NULL, 0);
+      }
+      if (addr >= sdk_flashchip.chip_size) addr = sdk_flashchip.chip_size - 1;
+      if (addr + len >= sdk_flashchip.chip_size) len = sdk_flashchip.chip_size - 1 - addr;
+      snprintf(extra_hdrs, sizeof(extra_hdrs),
+          "Content-Disposition: attachment; filename=\"spifl_dump@%08x_%i.raw\"\n", addr, len);
+      *extra_headers = extra_hdrs;
+      printf("dumping spiflash addr:0x%08x len:%i\n", addr, len);
+
+      make_spif_stream(&res_str, addr, len);
+
     } else {
+      // --- unknown resource
       make_null_stream(&res_str);
       *http_status = S404_NOT_FOUND;
     }
@@ -139,7 +183,7 @@ void server_task(void *pvParameters) {
     UWEB_parse(&socket_str, &socket_str);
 
     printf("client closed\n");
-    lwip_close(sock_fd);
+    lwip_close(client_fd);
   }
 
 

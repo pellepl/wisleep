@@ -7,3 +7,6 @@
 [submodule "src/uweb"]
 	path = src/uweb
 	url = https://github.com/pellepl/uweb.git
+[submodule "spiffs"]
+	path = spiffs
+	url = https://github.com/pellepl/spiffs.git

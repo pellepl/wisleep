@@ -16,6 +16,8 @@
 
 #include "server.h"
 
+#include "fs.h"
+
 #include "../umac/umac.h"
 
 static umac um;
@@ -172,6 +174,8 @@ void user_init(void) {
       10,
       false,
       (void *)um_tim_id, um_tim_cb);
+
+  (void)fs_mount();
 
   xTaskCreate(uart_task, (signed char * )"uart_task", 512, NULL, 2, NULL);
   xTaskCreate(server_task, (signed char *)"server_task", 512, NULL, 2, NULL);
