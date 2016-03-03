@@ -12,6 +12,7 @@
 #include "../uweb/src/uweb.h"
 #include "../uweb/src/uweb_http.h"
 #include "octet_spiflash.h"
+#include "fs.h"
 
 static uweb_data_stream socket_str, res_str;
 
@@ -73,7 +74,7 @@ static UW_STREAM make_char_stream(UW_STREAM str, const char *txt) {
   return str;
 }
 
-#define SPIFSTR_CHUNK_SZ      32 //UWEB_TX_MAX_LEN
+#define STREAM_CHUNK_SZ      32 //UWEB_TX_MAX_LEN
 
 static int32_t spifstr_read(UW_STREAM str, uint8_t *dst, uint32_t len) {
   uint32_t addr = (uint32_t)(intptr_t)str->user;
@@ -81,14 +82,14 @@ static int32_t spifstr_read(UW_STREAM str, uint8_t *dst, uint32_t len) {
   len = str->total_sz < len ? str->total_sz : len;
   (void)octet_spif_read(addr, dst, len);
   str->total_sz -= len;
-  str->avail_sz = SPIFSTR_CHUNK_SZ < str->total_sz ? SPIFSTR_CHUNK_SZ : str->total_sz;
+  str->avail_sz = STREAM_CHUNK_SZ < str->total_sz ? STREAM_CHUNK_SZ : str->total_sz;
   str->user = (void *)(intptr_t)(addr + len);
   return len;
 }
 static UW_STREAM make_spif_stream(UW_STREAM str, uint32_t addr, uint32_t len) {
   str->total_sz = len;
   str->capacity_sz = 0;
-  str->avail_sz = len < SPIFSTR_CHUNK_SZ ? len : SPIFSTR_CHUNK_SZ;
+  str->avail_sz = len < STREAM_CHUNK_SZ ? len : STREAM_CHUNK_SZ;
   str->read = spifstr_read;
   str->write = str_ret0;
   str->user = (void *)(intptr_t)addr;
@@ -96,7 +97,53 @@ static UW_STREAM make_spif_stream(UW_STREAM str, uint32_t addr, uint32_t len) {
 }
 
 
+static int32_t filestr_read(UW_STREAM str, uint8_t *dst, uint32_t len) {
+  spiffs_file fd  = (spiffs_file)(intptr_t)str->user;
+  len = str->avail_sz < len ? str->avail_sz : len;
+  len = str->total_sz < len ? str->total_sz : len;
+  int32_t res = fs_read(fd, dst, len);
+  if (res < 0) {
+    fs_close(fd);
+    return -1;
+  }
+  str->total_sz -= len;
+  str->avail_sz = STREAM_CHUNK_SZ < str->total_sz ? STREAM_CHUNK_SZ : str->total_sz;
+  if (str->total_sz == 0) {
+    fs_close(fd);
+  }
+  return len;
+}
+static UW_STREAM make_file_stream(UW_STREAM str, spiffs_file fd) {
+  spiffs_stat stat;
+  int32_t res = fs_fstat(fd, &stat);
+  uint32_t len = 0;
+  if (res == SPIFFS_OK) {
+    len = stat.size;
+  }
+  str->total_sz = len;
+  str->capacity_sz = 0;
+  str->avail_sz = len < STREAM_CHUNK_SZ ? len : STREAM_CHUNK_SZ;
+  str->read = filestr_read;
+  str->write = str_ret0;
+  str->user = (void *)(intptr_t)fd;
+  return str;
+}
+
+
 static const char *TEST = "Holy crap, it works!";
+
+static const char *UPLOAD =
+    "<!DOCTYPE html>"
+    "<html><body>"
+    "<form action=\"uploadfile\" method=\"post\" enctype=\"multipart/form-data\">"
+    "<fieldset>"
+    "<legend>Upload file</legend>"
+    "<input type=\"file\" name=\"upfile\" id=\"upfile\">"
+    "<input type=\"submit\" value=\"Upload\" name=\"submit\">"
+    "</fieldset>"
+    "</form>"
+    "</body></html>";
+
 static char extra_hdrs[128];
 
 static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
@@ -104,10 +151,19 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
     char **extra_headers) {
   if (req->chunk_nbr == 0) {
     printf("opening %s\n", &req->resource[1]);
+    WDT.FEED = WDT_FEED_MAGIC;
 
     if (strcmp(req->resource, "/index.html") == 0 || strlen(req->resource) == 1) {
       // --- index.html
       make_char_stream(&res_str, TEST);
+
+    } else if (strcmp(req->resource, "/upload") == 0) {
+      // --- upload page
+      make_char_stream(&res_str, UPLOAD);
+
+    } else if (strcmp(req->resource, "/uploadfile") == 0) {
+        // --- upload page
+      make_null_stream(&res_str);
 
     } else if (strstr(req->resource, "/spiflash") == req->resource) {
       // --- read spiflash
@@ -132,8 +188,13 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
 
     } else {
       // --- unknown resource
-      make_null_stream(&res_str);
-      *http_status = S404_NOT_FOUND;
+      spiffs_file fd = fs_open(&req->resource[1], SPIFFS_READ_ONLY, 0);
+      if (fd < 0) {
+        make_null_stream(&res_str);
+        *http_status = S404_NOT_FOUND;
+      } else {
+        make_file_stream(&res_str, fd);
+      }
     }
   }
   *res = &res_str;
@@ -143,7 +204,12 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
 
 static void uweb_data(uweb_request_header *req, uweb_data_type type,
     uint32_t offset, uint8_t *data, uint32_t length) {
-
+  printf("data recv offs:%i len:%i\n"
+         "     REQ meth:%i conn:%s type:%s chunked:%i chunk#:%i\n"
+         "     MLP nbr:%i content:%s  disp:%s\n",
+      offset, length,
+      req->method, req->connection, req->content_type, req->chunked, req->chunk_nbr,
+      req->cur_multipart.multipart_nbr, req->cur_multipart.content_type, req->cur_multipart.content_disp);
 }
 
 void server_task(void *pvParameters) {
