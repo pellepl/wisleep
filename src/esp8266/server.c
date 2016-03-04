@@ -33,7 +33,6 @@ static int32_t sockstr_write(UW_STREAM str, uint8_t *src, uint32_t len) {
 
 static UW_STREAM make_socket_stream(UW_STREAM str, int sockfd) {
   str->total_sz = -1;
-  str->capacity_sz = 0;
   str->avail_sz = 256;
   str->user = (void *)((intptr_t)sockfd);
   str->read = sockstr_read;
@@ -41,17 +40,11 @@ static UW_STREAM make_socket_stream(UW_STREAM str, int sockfd) {
   return str;
 }
 
-
-
-static int32_t str_ret0(UW_STREAM str, uint8_t *dst, uint32_t len) {
-  return 0;
-}
 static UW_STREAM make_null_stream(UW_STREAM str) {
   str->total_sz = 0;
-  str->capacity_sz = 0;
   str->avail_sz = 0;
-  str->read = str_ret0;
-  str->write = str_ret0;
+  str->read = 0;
+  str->write = 0;
   return str;
 }
 
@@ -66,10 +59,9 @@ static int32_t charstr_read(UW_STREAM str, uint8_t *dst, uint32_t len) {
 }
 static UW_STREAM make_char_stream(UW_STREAM str, const char *txt) {
   str->total_sz = strlen(txt);
-  str->capacity_sz = 0;
   str->avail_sz = str->total_sz;
   str->read = charstr_read;
-  str->write = str_ret0;
+  str->write = 0;
   str->user = (void *)txt;
   return str;
 }
@@ -88,10 +80,9 @@ static int32_t spifstr_read(UW_STREAM str, uint8_t *dst, uint32_t len) {
 }
 static UW_STREAM make_spif_stream(UW_STREAM str, uint32_t addr, uint32_t len) {
   str->total_sz = len;
-  str->capacity_sz = 0;
   str->avail_sz = len < STREAM_CHUNK_SZ ? len : STREAM_CHUNK_SZ;
   str->read = spifstr_read;
-  str->write = str_ret0;
+  str->write = 0;
   str->user = (void *)(intptr_t)addr;
   return str;
 }
@@ -121,10 +112,9 @@ static UW_STREAM make_file_stream(UW_STREAM str, spiffs_file fd) {
     len = stat.size;
   }
   str->total_sz = len;
-  str->capacity_sz = 0;
   str->avail_sz = len < STREAM_CHUNK_SZ ? len : STREAM_CHUNK_SZ;
   str->read = filestr_read;
-  str->write = str_ret0;
+  str->write = 0;
   str->user = (void *)(intptr_t)fd;
   return str;
 }
