@@ -175,8 +175,36 @@ void user_init(void) {
       false,
       (void *)um_tim_id, um_tim_cb);
 
-  (void)fs_mount();
+  if (fs_mount() >= 0) {
+    spiffs_DIR d;
+    struct spiffs_dirent e;
+    struct spiffs_dirent *pe = &e;
 
+    fs_opendir("/", &d);
+    while ((pe = fs_readdir(&d, pe))) {
+      printf("%s [%04x] size:%i\n", pe->name, pe->obj_id, pe->size);
+    }
+    fs_closedir(&d);
+  }
+
+#if 0
+  spiffs_file fd = fs_open("juli2015.txt", SPIFFS_RDONLY, 0);
+  printf("fd:%i\n", fd);
+  uint8_t buf[64];
+  int32_t len;
+  do {
+    len = fs_read(fd, buf, sizeof(buf));
+    printf("read res:%i\n", len);
+    if (len < 0) {
+      printf("fs err %i\n", fs_errno());
+      break;
+    }
+    int i;
+    for (i = 0; i < len; i++) printf("%c", buf[i]);
+    printf("\n");
+  } while (len > 0);
+  fs_close(fd);
+#endif
   xTaskCreate(uart_task, (signed char * )"uart_task", 512, NULL, 2, NULL);
   xTaskCreate(server_task, (signed char *)"server_task", 512, NULL, 2, NULL);
 }

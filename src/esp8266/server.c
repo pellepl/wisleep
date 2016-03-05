@@ -94,12 +94,14 @@ static int32_t filestr_read(UW_STREAM str, uint8_t *dst, uint32_t len) {
   len = str->total_sz < len ? str->total_sz : len;
   int32_t res = fs_read(fd, dst, len);
   if (res < 0) {
+    printf("err reading file fd=%i, fs err %i\n", fd, fs_errno());
     fs_close(fd);
     return -1;
   }
   str->total_sz -= len;
   str->avail_sz = STREAM_CHUNK_SZ < str->total_sz ? STREAM_CHUNK_SZ : str->total_sz;
   if (str->total_sz == 0) {
+    printf("closing file fd=%i\n", fd);
     fs_close(fd);
   }
   return len;
@@ -118,9 +120,6 @@ static UW_STREAM make_file_stream(UW_STREAM str, spiffs_file fd) {
   str->user = (void *)(intptr_t)fd;
   return str;
 }
-
-
-static const char *TEST = "Holy crap, it works!";
 
 static const char *UPLOAD =
     "<!DOCTYPE html>"
@@ -145,7 +144,14 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
 
     if (strcmp(req->resource, "/index.html") == 0 || strlen(req->resource) == 1) {
       // --- index.html
-      make_char_stream(&res_str, TEST);
+      spiffs_file fd = fs_open("index.html", SPIFFS_RDONLY, 0);
+      if (fd < 0) {
+        make_null_stream(&res_str);
+        *http_status = S404_NOT_FOUND;
+      } else {
+        printf("opening fs file %s (fd=%i)\n", &req->resource[1], fd);
+        make_file_stream(&res_str, fd);
+      }
 
     } else if (strcmp(req->resource, "/upload") == 0) {
       // --- upload page
@@ -178,11 +184,12 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
 
     } else {
       // --- unknown resource
-      spiffs_file fd = fs_open(&req->resource[1], SPIFFS_READ_ONLY, 0);
+      spiffs_file fd = fs_open(&req->resource[1], SPIFFS_RDONLY, 0);
       if (fd < 0) {
         make_null_stream(&res_str);
         *http_status = S404_NOT_FOUND;
       } else {
+        printf("opening fs file %s (fd=%i)\n", &req->resource[1], fd);
         make_file_stream(&res_str, fd);
       }
     }
@@ -192,6 +199,8 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
   return UWEB_CHUNKED;
 }
 
+static spiffs_file cur_upload_fd = 0;
+
 static void uweb_data(uweb_request_header *req, uweb_data_type type,
     uint32_t offset, uint8_t *data, uint32_t length) {
   printf("data recv offs:%i len:%i\n"
@@ -200,6 +209,39 @@ static void uweb_data(uweb_request_header *req, uweb_data_type type,
       offset, length,
       req->method, req->connection, req->content_type, req->chunked, req->chunk_nbr,
       req->cur_multipart.multipart_nbr, req->cur_multipart.content_type, req->cur_multipart.content_disp);
+
+  // check if upload file request
+  if (strstr(req->cur_multipart.content_disp, "name=\"upfile\"")) {
+    char *fname, *fname_end;
+    if (cur_upload_fd > 0 && data == 0 && length == 0) {
+      printf("closing uploaded file\n");
+      fs_close(cur_upload_fd);
+      cur_upload_fd = 0;
+    } else if (req->cur_multipart.multipart_nbr == 0 &&
+        (fname = strstr(req->cur_multipart.content_disp, "filename=\"")) &&
+        (fname_end = strchr(fname + 10, '\"'))) {
+      fname += 10; //filename="
+      *fname_end = 0;
+      printf("request to save file %s\n", fname);
+      cur_upload_fd = fs_open(fname, SPIFFS_RDWR | SPIFFS_CREAT | SPIFFS_TRUNC, 0);
+      if (cur_upload_fd > 0) {
+        int32_t res = fs_write(cur_upload_fd, data, length);
+        if (res < SPIFFS_OK) {
+          printf("error saving upload data err %i\n", fs_errno());
+          fs_close(cur_upload_fd);
+          cur_upload_fd = 0;
+        }
+      }
+    } else if (cur_upload_fd > 0) {
+      int32_t res = fs_write(cur_upload_fd, data, length);
+      if (res < SPIFFS_OK) {
+        printf("error saving upload data err %i\n", fs_errno());
+        fs_close(cur_upload_fd);
+        cur_upload_fd = 0;
+      }
+    }
+  }
+
 }
 
 void server_task(void *pvParameters) {

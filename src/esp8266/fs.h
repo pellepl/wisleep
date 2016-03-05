@@ -58,8 +58,10 @@ SPIFFS_errno(&__spiffs__)
 SPIFFS_clearerr(&__spiffs__)
 #define fs_opendir(__path, __dir) \
 SPIFFS_opendir(&__spiffs__, __path, __dir)
+#define fs_readdir(__d, __e) \
+SPIFFS_readdir(__d, __e)
 #define fs_closedir(__dirent) \
-SPIFFS_closedir(&__spiffs__, __dirent)
+SPIFFS_closedir(__dirent)
 #define fs_info(__total, __used) \
 SPIFFS_info(&__spiffs__, __total, __used)
 #define fs_format() \
