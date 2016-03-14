@@ -14,24 +14,55 @@
 #include "octet_spiflash.h"
 #include "fs.h"
 
-static uweb_data_stream socket_str, res_str;
+//#define RAW_SERV // TODO
+//#define NETCONN_SERV
+#define SOCK_SERV
 
-static int32_t sockstr_read(UW_STREAM str, uint8_t *dst, uint32_t len) {
-  int32_t r = recv((intptr_t)str->user, dst, len, 0);
-  return r;
+struct part_def_s;
+
+typedef uint32_t (* generate_partial_content_f)(struct part_def_s *part, uint32_t max_len, uint32_t part_nbr, uint8_t *dst);
+
+typedef struct part_def_s {
+  uint8_t content[256];
+  generate_partial_content_f gen_fn;
+  uint32_t nbr;
+  uint32_t len;
+  uint32_t ix;
+  void *user;
+} part_def;
+
+static uint32_t _upload_sz;
+static spiffs_file _upload_fd = 0;
+static uweb_data_stream _stream_tcp, _stream_res;
+
+static int get_errno(int sock_fd) {
+  int error;
+  uint32_t optlen = sizeof(error);
+  (void)lwip_getsockopt(sock_fd, SOL_SOCKET, SO_ERROR, &error, &optlen);
+  return error;
 }
 
+#ifdef SOCK_SERV
+static int32_t sockstr_read(UW_STREAM str, uint8_t *dst, uint32_t len) {
+  int32_t r = recv((intptr_t)str->user, dst, len, 0);
+  if (r < 0) {
+    printf("sockstr_rd err:%i\n", get_errno((intptr_t)str->user));
+  }
+  return r;
+}
 static int32_t sockstr_write(UW_STREAM str, uint8_t *src, uint32_t len) {
   int l = 0;
   while (len) {
     l = lwip_write((intptr_t)str->user, src, len);
-    if (l < 0) break;
+    if (l < 0) {
+      printf("sockstr_wr err:%i\n", get_errno((intptr_t)str->user));
+      break;
+    }
     len -= l;
   }
   return l;
 }
-
-static UW_STREAM make_socket_stream(UW_STREAM str, int sockfd) {
+static UW_STREAM make_tcp_stream(UW_STREAM str, int sockfd) {
   str->total_sz = -1;
   str->avail_sz = 256;
   str->user = (void *)((intptr_t)sockfd);
@@ -39,6 +70,59 @@ static UW_STREAM make_socket_stream(UW_STREAM str, int sockfd) {
   str->write = sockstr_write;
   return str;
 }
+#endif // SOCK_SERV
+#ifdef NETCONN_SERV
+static struct netbuf *_nb = NULL;
+static int32_t netconn_str_read(UW_STREAM str, uint8_t *dst, uint32_t len) {
+  struct netconn *nc = (struct netconn *)str->user;
+  int32_t r = -1;
+  err_t err = ERR_OK;
+  if (str->avail_sz == 0 || _nb == NULL) {
+    printf("nc recv - ");
+    err = netconn_recv(nc, &_nb);
+    if (err == ERR_OK) {
+      printf("ok, len %i\n", netbuf_len(_nb));
+      str->total_sz = 0; // use as offset, safe as we're chunking always
+      netbuf_first(_nb);
+      str->avail_sz = netbuf_len(_nb);
+    } else {
+      printf("err %i\n", err);
+      _nb = NULL;
+      return -1;
+    }
+  }
+  if (err == ERR_OK || _nb != NULL) {
+    uint32_t rd_len = str->avail_sz < len ? str->avail_sz : len;
+    r = netbuf_copy_partial(_nb, dst, rd_len, str->total_sz);
+    if (r == 0) {
+      _nb = NULL;
+      str->avail_sz = 0;
+      return -1;
+    }
+    str->total_sz += r;
+    if (r > str->avail_sz) {
+      str->avail_sz = 0;
+    } else {
+      str->avail_sz -= r;
+    }
+  }
+  return r;
+}
+static int32_t netconn_str_write(UW_STREAM str, uint8_t *src, uint32_t len) {
+  struct netconn *nc = (struct netconn *)str->user;
+  int res = 0;
+  res = netconn_write(nc, src, len, NETCONN_COPY);
+  return res == ERR_OK ? len : res;
+}
+static UW_STREAM make_tcp_stream(UW_STREAM str, struct netconn *nc) {
+  str->total_sz = -1;
+  str->avail_sz = 256;
+  str->user = (void *)(nc);
+  str->read = netconn_str_read;
+  str->write = netconn_str_write;
+  return str;
+}
+#endif // NETCONN_SERV
 
 static UW_STREAM make_null_stream(UW_STREAM str) {
   str->total_sz = 0;
@@ -66,12 +150,14 @@ static UW_STREAM make_char_stream(UW_STREAM str, const char *txt) {
   return str;
 }
 
-#define STREAM_CHUNK_SZ      32 //UWEB_TX_MAX_LEN
+#define STREAM_CHUNK_SZ      256 /* this seems to be an optimal length */ //UWEB_TX_MAX_LEN
 
 static int32_t spifstr_read(UW_STREAM str, uint8_t *dst, uint32_t len) {
+  //WDT.FEED = WDT_FEED_MAGIC;
   uint32_t addr = (uint32_t)(intptr_t)str->user;
   len = str->avail_sz < len ? str->avail_sz : len;
   len = str->total_sz < len ? str->total_sz : len;
+  printf("dump spi flash @ %08x: %i\n", addr, len);
   (void)octet_spif_read(addr, dst, len);
   str->total_sz -= len;
   str->avail_sz = STREAM_CHUNK_SZ < str->total_sz ? STREAM_CHUNK_SZ : str->total_sz;
@@ -86,6 +172,49 @@ static UW_STREAM make_spif_stream(UW_STREAM str, uint32_t addr, uint32_t len) {
   str->user = (void *)(intptr_t)addr;
   return str;
 }
+
+
+static part_def part;
+
+static void part_update(UW_STREAM str) {
+  part_def *part = (part_def *)str->user;
+  part->ix = 0;
+  part->len = part->gen_fn(part, sizeof(part->content), part->nbr, part->content);
+  str->avail_sz = part->len;
+  part->nbr++;
+}
+
+static int32_t partstr_read(UW_STREAM str, uint8_t *dst, uint32_t len) {
+  part_def *part = (part_def *)str->user;
+  if (part->ix < part->len) {
+    uint32_t rd_len = len < (part->len - part->ix) ? len : (part->len - part->ix);
+    memcpy(dst, &part->content[part->ix], rd_len);
+    part->ix += rd_len;
+    str->avail_sz -= str->avail_sz < rd_len ? str->avail_sz : rd_len;
+    if (str->avail_sz == 0 && part->gen_fn) {
+      part_update(str);
+    }
+
+    return rd_len;
+  } else {
+    return 0;
+  }
+}
+static UW_STREAM make_partial_stream(UW_STREAM str, part_def *part, generate_partial_content_f fn, void *user) {
+  str->user = part;
+  part->nbr = 0;
+  part->user = user;
+  part->gen_fn = fn;
+  part_update(str);
+  str->total_sz = 0;
+  str->read = partstr_read;
+  str->write = NULL;
+  return str;
+}
+static void close_partial_stream(part_def *part) {
+  part->gen_fn = NULL;
+}
+
 
 
 static int32_t filestr_read(UW_STREAM str, uint8_t *dst, uint32_t len) {
@@ -121,45 +250,168 @@ static UW_STREAM make_file_stream(UW_STREAM str, spiffs_file fd) {
   return str;
 }
 
-static const char *UPLOAD =
+
+///////////////////////////////////////////////////////////////////////////////
+
+
+static uint32_t part_upload(part_def *part, uint32_t max_len, uint32_t part_nbr, uint8_t *dst) {
+  uint32_t len = 0;
+  if (part->nbr == 0) {
+    if (_upload_fd) {
+      sprintf((char *)dst,
+        "<!DOCTYPE html>"
+        "<html><body onload=\"setTimeout('location.reload(true);',1000);\">"
+        "<fieldset>"
+          "<legend>File upload</legend>"
+          "%i bytes"
+        "</fieldset>"
+        "</body></html>", _upload_sz
+       );
+    } else {
+      sprintf((char *)dst,
+        "<!DOCTYPE html>"
+        "<html><body onload=\"window.location.href ='ls';\">"
+        "</body></html>");
+    }
+    len = strlen((char *)dst);
+    close_partial_stream(part);
+  }
+  return len;
+}
+
+
+static spiffs_DIR _ls_d;
+
+static uint32_t part_ls(part_def *part, uint32_t max_len, uint32_t part_nbr, uint8_t *dst) {
+  uint32_t len = 0;
+  if (part->nbr == 0) {
+    const char *LS_PRE =
+        "<!DOCTYPE html>"
+        "<html><body>"
+        "<table style=\"border:1px solid\">"
+        "<tr><td><b>NAME</b></td><td><b>SIZE</b></td><td><b>OBJID</b></td><td><b>DELETE</b></td></tr>";
+    part->user = (void *)fs_opendir("/", &_ls_d);
+    len = strlen(LS_PRE);
+    memcpy(dst, LS_PRE, len);
+  } else if (part->nbr >= 0x10000) {
+    sprintf((char *)dst,
+      "<p><button onclick=\"doform()\">Format</button></p>"
+      "<script>"
+      "function doform() {"
+        "if (confirm(\"Really format?\")==true) {"
+          "window.location.href='format';"
+        "}"
+      "}"
+      "</script>"
+      "</body></html>"
+        );
+    len = strlen((char *)dst);
+    close_partial_stream(part);
+  } else {
+    spiffs_DIR *d = (spiffs_DIR *)part->user;
+    struct spiffs_dirent e;
+    struct spiffs_dirent *pe = &e;
+    if ((pe = fs_readdir(d, pe))) {
+      sprintf((char *)dst,
+          "<tr><td><a href=\"%s\">"
+          "%s</a></td>"
+          "<td>%i</td>"
+          "<td>%04x</td>"
+          "<td><a href=\"/rm?name=%s\">X</a></td>"
+          "</tr>",
+          e.name, e.name, e.size, e.obj_id, e.name);
+      len = strlen((char *)dst);
+    } else {
+      uint32_t total, used;
+      fs_info(&total, &used);
+      sprintf((char *)dst,
+        "<tr><td colspan=\"4\">&nbsp;</td></tr>"
+        "<tr><td>USED</td><td>%i</td><td>TOTAL</td><td>%i</td></tr>"
+        "</table>",
+      used, total);
+      len = strlen((char *)dst);
+      part->nbr = 0x10000;
+    }
+  }
+  return len;
+}
+
+
+static const char *DEF_INDEX =
     "<!DOCTYPE html>"
     "<html><body>"
-    "<form action=\"uploadfile\" method=\"post\" enctype=\"multipart/form-data\">"
-    "<fieldset>"
-    "<legend>Upload file</legend>"
-    "<input type=\"file\" name=\"upfile\" id=\"upfile\">"
-    "<input type=\"submit\" value=\"Upload\" name=\"submit\">"
-    "</fieldset>"
+    "<h1>wisleep</h1>"
+    "<link rel=\"icon\" href=\"favicon.ico\"/>"
+    "<form action=\"spiflash\" method=\"get\">"
+      "<fieldset>"
+        "<legend>Dump spi flash</legend>"
+        "Address:<br>"
+        "<input type=\"text\" name=\"addr\" value=\"0x00000000\"><br>"
+        "Length:<br>"
+        "<input type=\"text\" name=\"len\" value=\"1024\"><br><br>"
+        "<input type=\"submit\" value=\"Dump\">"
+      "</fieldset>"
     "</form>"
+    "<form action=\"uploadfile\" method=\"post\" enctype=\"multipart/form-data\">"
+      "<fieldset>"
+        "<legend>Upload file</legend>"
+        "<input type=\"file\" name=\"upfile\" id=\"upfile\">"
+        "<input type=\"submit\" value=\"Upload\" name=\"submit\">"
+      "</fieldset>"
+    "</form>"
+    "<p><a href=\"ls\">List files</a></p>"
+    "</body></html>"
+        ;
+static const char *NOTFOUND =
+    "<!DOCTYPE html>"
+    "<html><body>"
+    "404 Not found. Bah."
     "</body></html>";
 
+
+///////////////////////////////////////////////////////////////////////////////
+
+
 static char extra_hdrs[128];
+
+static part_def part;
 
 static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
     uweb_http_status *http_status, char *content_type,
     char **extra_headers) {
   if (req->chunk_nbr == 0) {
     printf("opening %s\n", &req->resource[1]);
+    make_null_stream(&_stream_res);
     WDT.FEED = WDT_FEED_MAGIC;
 
     if (strcmp(req->resource, "/index.html") == 0 || strlen(req->resource) == 1) {
       // --- index.html
       spiffs_file fd = fs_open("index.html", SPIFFS_RDONLY, 0);
       if (fd < 0) {
-        make_null_stream(&res_str);
-        *http_status = S404_NOT_FOUND;
+        make_char_stream(&_stream_res, DEF_INDEX);
       } else {
         printf("opening fs file %s (fd=%i)\n", &req->resource[1], fd);
-        make_file_stream(&res_str, fd);
+        make_file_stream(&_stream_res, fd);
       }
 
-    } else if (strcmp(req->resource, "/upload") == 0) {
-      // --- upload page
-      make_char_stream(&res_str, UPLOAD);
-
     } else if (strcmp(req->resource, "/uploadfile") == 0) {
-        // --- upload page
-      make_null_stream(&res_str);
+        // --- uploading page
+      make_partial_stream(&_stream_res, &part, part_upload, NULL);
+
+    } else if (strcmp(req->resource, "/ls") == 0) {
+        // --- file list page
+      make_partial_stream(&_stream_res, &part, part_ls, NULL);
+
+    } else if (strstr(req->resource, "/rm?name=") == req->resource) {
+        // --- rm file and file list page
+      char *fname = (char *)&req->resource[9]; // strlen(/rm?name=)
+      fs_remove(fname);
+      make_partial_stream(&_stream_res, &part, part_ls, NULL);
+
+    } else if (strcmp(req->resource, "/format") == 0) {
+        // --- format and file list page
+      fs_format();
+      make_partial_stream(&_stream_res, &part, part_ls, NULL);
 
     } else if (strstr(req->resource, "/spiflash") == req->resource) {
       // --- read spiflash
@@ -180,26 +432,30 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
       *extra_headers = extra_hdrs;
       printf("dumping spiflash addr:0x%08x len:%i\n", addr, len);
 
-      make_spif_stream(&res_str, addr, len);
+      make_spif_stream(&_stream_res, addr, len);
 
     } else {
       // --- unknown resource
-      spiffs_file fd = fs_open(&req->resource[1], SPIFFS_RDONLY, 0);
+      char *fname = &req->resource[1];
+      if (fname[0] == '.') fname++;
+      spiffs_file fd = fs_open(fname, SPIFFS_RDONLY, 0);
       if (fd < 0) {
-        make_null_stream(&res_str);
+        make_char_stream(&_stream_res, NOTFOUND);
         *http_status = S404_NOT_FOUND;
       } else {
-        printf("opening fs file %s (fd=%i)\n", &req->resource[1], fd);
-        make_file_stream(&res_str, fd);
+        printf("opening fs file %s (fd=%i)\n", fname, fd);
+        if (strstr(fname, ".jpg") || strstr(fname, ".jpeg") || strstr(fname, ".JPG") || strstr(fname, ".JPEG")) {
+          sprintf(content_type, "image/jpeg");
+        }
+        make_file_stream(&_stream_res, fd);
       }
     }
+
   }
-  *res = &res_str;
+  *res = &_stream_res;
 
   return UWEB_CHUNKED;
 }
-
-static spiffs_file cur_upload_fd = 0;
 
 static void uweb_data(uweb_request_header *req, uweb_data_type type,
     uint32_t offset, uint8_t *data, uint32_t length) {
@@ -213,89 +469,53 @@ static void uweb_data(uweb_request_header *req, uweb_data_type type,
   // check if upload file request
   if (strstr(req->cur_multipart.content_disp, "name=\"upfile\"")) {
     char *fname, *fname_end;
-    if (cur_upload_fd > 0 && data == 0 && length == 0) {
+    if (_upload_fd > 0 && data == 0 && length == 0) {
       printf("closing uploaded file\n");
-      fs_close(cur_upload_fd);
-      cur_upload_fd = 0;
+      fs_close(_upload_fd);
+      _upload_fd = 0;
     } else if (req->cur_multipart.multipart_nbr == 0 &&
         (fname = strstr(req->cur_multipart.content_disp, "filename=\"")) &&
         (fname_end = strchr(fname + 10, '\"'))) {
       fname += 10; //filename="
       *fname_end = 0;
       printf("request to save file %s\n", fname);
-      cur_upload_fd = fs_open(fname, SPIFFS_RDWR | SPIFFS_CREAT | SPIFFS_TRUNC, 0);
-      if (cur_upload_fd > 0) {
-        int32_t res = fs_write(cur_upload_fd, data, length);
+      _upload_fd = fs_open(fname, SPIFFS_RDWR | SPIFFS_CREAT | SPIFFS_TRUNC, 0);
+      if (_upload_fd > 0) {
+        int32_t res = fs_write(_upload_fd, data, length);
+        _upload_sz = length;
         if (res < SPIFFS_OK) {
           printf("error saving upload data err %i\n", fs_errno());
-          fs_close(cur_upload_fd);
-          cur_upload_fd = 0;
+          fs_close(_upload_fd);
+          _upload_fd = 0;
         }
       }
-    } else if (cur_upload_fd > 0) {
-      int32_t res = fs_write(cur_upload_fd, data, length);
+    } else if (_upload_fd > 0) {
+      int32_t res = fs_write(_upload_fd, data, length);
+      _upload_sz += length;
       if (res < SPIFFS_OK) {
         printf("error saving upload data err %i\n", fs_errno());
-        fs_close(cur_upload_fd);
-        cur_upload_fd = 0;
+        fs_close(_upload_fd);
+        _upload_fd = 0;
       }
     }
   }
 
 }
 
+#ifdef NETCONN_SERV
 void server_task(void *pvParameters) {
-  int sock_fd, client_fd;
-  struct sockaddr_in sa, isa;
-
   UWEB_init(uweb_resp, uweb_data);
-  sock_fd = lwip_socket(PF_INET, SOCK_STREAM, 0);
-  if (sock_fd < 0) {
-    printf("socket failed\n");
-    return;
-  }
-  memset(&sa, 0, sizeof(struct sockaddr_in));
-  sa.sin_family = AF_INET;
-  sa.sin_addr.s_addr = INADDR_ANY;
-  sa.sin_port = htons(80);
 
-  if (lwip_bind(sock_fd, (struct sockaddr *)&sa, sizeof(sa) < 0)) {
-    printf("bind failed\n");
-    lwip_close(sock_fd);
-    return;
-  }
-
-  lwip_listen(sock_fd, 3);
-  socklen_t addr_size = sizeof(sa);
-  printf("listening to port 80\n");
-  while (true) {
-    client_fd = lwip_accept(sock_fd, (struct sockaddr *)&isa, &addr_size);
-    if (client_fd < 0) {
-      printf("accept failed\n");
-      lwip_close(sock_fd);
-      return;
-    }
-    printf("client accepted\n");
-
-    make_socket_stream(&socket_str, client_fd);
-    UWEB_parse(&socket_str, &socket_str);
-
-    printf("client closed\n");
-    lwip_close(client_fd);
-  }
-
-
-#if 0
   struct netconn *nc = netconn_new(NETCONN_TCP);
-  if(!nc) {
-    printf("Status monitor: Failed to allocate socket.\n");
+  if (!nc) {
+    printf("netconn alloc fail\n");
     return;
   }
-  printf("listening on port 80\n");
   netconn_bind(nc, IP_ADDR_ANY, 80);
   netconn_listen(nc);
+  printf("listening on port 80\n");
 
-  while(1) {
+  while (1) {
     struct netconn *client = NULL;
     err_t err = netconn_accept(nc, &client);
 
@@ -307,26 +527,80 @@ void server_task(void *pvParameters) {
     }
 
     printf("connection\n");
-    make_socket_stream(&socket_str, client);
-    UWEB_parse(&socket_str, &socket_str);
-    ip_addr_t client_addr;
-    uint16_t port_ignore;
-    netconn_peer(client, &client_addr, &port_ignore);
-
-    char buf[80];
-    snprintf(buf, sizeof(buf), "Uptime %d seconds\r\n",
-       xTaskGetTickCount()*portTICK_RATE_MS/1000);
-    netconn_write(client, buf, strlen(buf), NETCONN_COPY);
-    snprintf(buf, sizeof(buf), "Free heap %d bytes\r\n", (int)xPortGetFreeHeapSize());
-    netconn_write(client, buf, strlen(buf), NETCONN_COPY);
-    snprintf(buf, sizeof(buf), "Your address is %d.%d.%d.%d\r\n\r\n",
-             ip4_addr1(&client_addr), ip4_addr2(&client_addr),
-             ip4_addr3(&client_addr), ip4_addr4(&client_addr));
-    netconn_write(client, buf, strlen(buf), NETCONN_COPY);
+    make_tcp_stream(&_stream_tcp, client);
+    UWEB_parse(&_stream_tcp, &_stream_tcp);
+//    ip_addr_t client_addr;
+//    uint16_t port_ignore;
+//    netconn_peer(client, &client_addr, &port_ignore);
     netconn_delete(client);
+    printf("closed\n");
   }
-#endif
 }
+#endif
+#ifdef SOCK_SERV
+void server_task(void *pvParameters) {
+  int sock_fd, client_fd;
+  struct sockaddr_in sa, isa;
+
+  UWEB_init(uweb_resp, uweb_data);
+
+  while (1) {
+    printf("socket serv setup\n");
+    sock_fd = lwip_socket(PF_INET, SOCK_STREAM, 0);
+    if (sock_fd < 0) {
+      printf("socket failed\n");
+      return;
+    }
+    memset(&sa, 0, sizeof(struct sockaddr_in));
+    sa.sin_family = AF_INET;
+    sa.sin_addr.s_addr = INADDR_ANY;
+    sa.sin_port = htons(80);
+
+    if (lwip_bind(sock_fd, (struct sockaddr *)&sa, sizeof(sa) < 0)) {
+      printf("bind failed\n");
+      lwip_close(sock_fd);
+      return;
+    }
+
+    lwip_listen(sock_fd, 3);
+    socklen_t addr_size = sizeof(sa);
+    printf("listening to port 80\n");
+    while (true) {
+      client_fd = lwip_accept(sock_fd, (struct sockaddr *)&isa, &addr_size);
+      if (client_fd < 0) {
+        printf("accept failed err %i\n", get_errno(sock_fd));
+        lwip_close(sock_fd);
+        break;
+      }
+      printf("client accepted\n");
+
+#if 0
+       {
+        struct timeval timeout = {
+            .tv_sec = 3,
+            .tv_usec = 0
+        };
+
+        if (lwip_setsockopt(sock_fd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) != 0) {
+          printf("set recvtmo err %i\n", get_errno(sock_fd));
+        }
+        if (lwip_setsockopt(sock_fd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout)) != 0) {
+          printf("set sendtmo err %i\n", get_errno(sock_fd));
+        }
+        if (lwip_fcntl(sock_fd, F_SETFL, O_NONBLOCK) != 0) {
+          printf("set nonblock err %i\n", get_errno(sock_fd));
+        }
+      }
+#endif
+      make_tcp_stream(&_stream_tcp, client_fd);
+      UWEB_parse(&_stream_tcp, &_stream_tcp);
+
+      printf("client closed\n");
+      lwip_close(client_fd);
+    }
+  }
+}
+#endif
 
 
 

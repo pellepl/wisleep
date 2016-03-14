@@ -65,7 +65,11 @@ SPIFFS_closedir(__dirent)
 #define fs_info(__total, __used) \
 SPIFFS_info(&__spiffs__, __total, __used)
 #define fs_format() \
-SPIFFS_format(&__spiffs__)
+  do { \
+    SPIFFS_unmount(&__spiffs__); \
+    SPIFFS_format(&__spiffs__); \
+    fs_mount(); \
+  } while(0);
 #define fs_mounted() \
 SPIFFS_mounted(&__spiffs__)
 #define fs_gc_quick(__max_free_pages) \

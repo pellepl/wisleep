@@ -118,41 +118,10 @@ static void umac_impl_timeout(umac_pkt *pkt) {
   (void)pkt;
 }
 
+//#define AP
+
 void user_init(void) {
   uart_set_baud(0, 921600);
-  //sdk_wifi_set_opmode(STATION_MODE);
-
-  sdk_wifi_set_opmode(SOFTAP_MODE);
-
-  struct ip_info ap_ip;
-  IP4_ADDR(&ap_ip.ip, 192, 169, 1, 1);
-  IP4_ADDR(&ap_ip.gw, 0, 0, 0, 0);
-  IP4_ADDR(&ap_ip.netmask, 255, 255, 255, 0);
-  sdk_wifi_set_ip_info(1, &ap_ip);
-
-
-  struct sdk_softap_config ap_cfg = {
-      .ssid = "WISLEEP",
-      .password = "",
-      .ssid_len = 7,
-      .channel = 1,
-      .authmode = AUTH_OPEN,
-      .ssid_hidden = false,
-      .max_connection = 3,
-      .beacon_interval = 100
-  };
-
-  sdk_wifi_softap_set_config(&ap_cfg);
-
-  ip_addr_t first_client_ip;
-  IP4_ADDR(&first_client_ip, 192, 169, 1, 100);
-  dhcpserver_start(&first_client_ip, 4);
-
-
-  //sdk_wifi_set_phy_mode(PHY_MODE_11G);
-
-  volatile uint32_t a = 0x100000;
-  while (--a);
 
   printf("\n\nESP8266 UMAC\n\n");
 
@@ -175,6 +144,10 @@ void user_init(void) {
       false,
       (void *)um_tim_id, um_tim_cb);
 
+  char ap_cred[128];
+  struct sdk_station_config config;
+  bool setup_ap = true;
+
   if (fs_mount() >= 0) {
     spiffs_DIR d;
     struct spiffs_dirent e;
@@ -185,26 +158,58 @@ void user_init(void) {
       printf("%s [%04x] size:%i\n", pe->name, pe->obj_id, pe->size);
     }
     fs_closedir(&d);
+
+    spiffs_file fd_ssid = fs_open(".ssid", SPIFFS_RDONLY, 0);
+    if (fd_ssid > 0) {
+      if (fs_read(fd_ssid, (uint8_t *)ap_cred, sizeof(ap_cred)) > 0) {
+        fs_close(fd_ssid);
+        char *nl_ix = strchr(ap_cred, '\n');
+        if (nl_ix > 0) {
+          memset(&config, 0, sizeof(struct sdk_station_config));
+          strncpy((char *)&config.ssid, ap_cred, nl_ix - ap_cred);
+          char *nl_ix2 = strchr(nl_ix + 1, '\n');
+          if (nl_ix2 > 0) {
+            strncpy((char *)&config.password, nl_ix + 1, nl_ix2 - (nl_ix + 1));
+            setup_ap = false;
+          }
+        }
+
+      } // if read
+    } // if fs_ssid
+  } // if mount
+
+  if (setup_ap) {
+    sdk_wifi_set_opmode(SOFTAP_MODE);
+
+    struct ip_info ap_ip;
+    IP4_ADDR(&ap_ip.ip, 192, 169, 1, 1);
+    IP4_ADDR(&ap_ip.gw, 0, 0, 0, 0);
+    IP4_ADDR(&ap_ip.netmask, 255, 255, 255, 0);
+    sdk_wifi_set_ip_info(1, &ap_ip);
+
+
+    struct sdk_softap_config ap_cfg = {
+        .ssid = "WISLEEP",
+        .password = "",
+        .ssid_len = 7,
+        .channel = 1,
+        .authmode = AUTH_OPEN,
+        .ssid_hidden = false,
+        .max_connection = 255,
+        .beacon_interval = 100
+    };
+
+    sdk_wifi_softap_set_config(&ap_cfg);
+
+    ip_addr_t first_client_ip;
+    IP4_ADDR(&first_client_ip, 192, 169, 1, 100);
+    dhcpserver_start(&first_client_ip, 4);
+  } else {
+    // required to call wifi_set_opmode before station_set_config
+    sdk_wifi_set_opmode(STATION_MODE);
+    sdk_wifi_station_set_config(&config);
   }
 
-#if 0
-  spiffs_file fd = fs_open("juli2015.txt", SPIFFS_RDONLY, 0);
-  printf("fd:%i\n", fd);
-  uint8_t buf[64];
-  int32_t len;
-  do {
-    len = fs_read(fd, buf, sizeof(buf));
-    printf("read res:%i\n", len);
-    if (len < 0) {
-      printf("fs err %i\n", fs_errno());
-      break;
-    }
-    int i;
-    for (i = 0; i < len; i++) printf("%c", buf[i]);
-    printf("\n");
-  } while (len > 0);
-  fs_close(fd);
-#endif
   xTaskCreate(uart_task, (signed char * )"uart_task", 512, NULL, 2, NULL);
-  xTaskCreate(server_task, (signed char *)"server_task", 512, NULL, 2, NULL);
+  xTaskCreate(server_task, (signed char *)"server_task", 1024, NULL, 2, NULL);
 }
