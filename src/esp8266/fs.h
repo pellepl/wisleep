@@ -80,6 +80,8 @@ SPIFFS_gc(&__spiffs__, __sz)
 SPIFFS_tell(&__spiffs__, __fh)
 #define fs_eof(__fh) \
 SPIFFS_eof(&__spiffs__, __fh)
+#define fs_check() \
+SPIFFS_check(&__spiffs__)
 #define fs_vis() \
 SPIFFS_vis(&__spiffs__)
 

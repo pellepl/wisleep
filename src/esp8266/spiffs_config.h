@@ -22,13 +22,14 @@ typedef int16_t  s16_t;
 typedef uint32_t u32_t;
 typedef int32_t  s32_t;
 
-#define SPIFFS_DBG(...) //printf(__VA_ARGS__)
-#define SPIFFS_GC_DBG(...) //printf(__VA_ARGS__)
-#define SPIFFS_CACHE_DBG(...) //printf(__VA_ARGS__)
-#define SPIFFS_CHECK_DBG(...) //printf(__VA_ARGS__)
+#define SPIFFS_DBG(...)       //printf("FS\t"__VA_ARGS__)
+#define SPIFFS_GC_DBG(...)    //printf("FSGC\t"__VA_ARGS__)
+#define SPIFFS_CACHE_DBG(...) //printf("FSCA\t"__VA_ARGS__)
+#define SPIFFS_CHECK_DBG(...) //printf("FSCH\t"__VA_ARGS__)
 
 #define SPIFFS_BUFFER_HELP              0
 #define SPIFFS_CACHE                    1
+#define SPIFFS_CACHE_WR                 1
 #define SPIFFS_CACHE_STATS              0
 #define SPIFFS_PAGE_CHECK               1
 #define SPIFFS_GC_MAX_RUNS              5

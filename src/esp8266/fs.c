@@ -21,6 +21,54 @@ spiffs __spiffs__;
 static uint32_t _fs_work[2 * FS_PAGE_SZ / sizeof(uint32_t)];
 static uint32_t _fs_desc[FS_DESCRIPTORS * 40 / sizeof(uint32_t)];
 static uint32_t _fs_cache[FS_CACHE_PAGES * (FS_PAGE_SZ + 40) / sizeof(uint32_t)];
+static uint32_t old_perc = 999;
+
+static void _spiffs_check_cb_f(spiffs *fs, spiffs_check_type type, spiffs_check_report report,
+    u32_t arg1, u32_t arg2) {
+  uint32_t perc = arg1 * 100 / 256;
+  if (report == SPIFFS_CHECK_PROGRESS && old_perc != perc) {
+      old_perc = perc;
+      printf("CHECK REPORT: ");
+      switch(type) {
+      case SPIFFS_CHECK_LOOKUP:
+        printf("LU "); break;
+      case SPIFFS_CHECK_INDEX:
+        printf("IX "); break;
+      case SPIFFS_CHECK_PAGE:
+        printf("PA "); break;
+      }
+      printf("%i%%\n", perc);
+  }
+  if (report != SPIFFS_CHECK_PROGRESS) {
+    printf("   check: ");
+    switch (type) {
+    case SPIFFS_CHECK_INDEX:
+      printf("INDEX  "); break;
+    case SPIFFS_CHECK_LOOKUP:
+      printf("LOOKUP "); break;
+    case SPIFFS_CHECK_PAGE:
+      printf("PAGE   "); break;
+    default:
+      printf("????   "); break;
+    }
+    if (report == SPIFFS_CHECK_ERROR) {
+      printf("ERROR %i", arg1);
+    } else if (report == SPIFFS_CHECK_DELETE_BAD_FILE) {
+      printf("DELETE BAD FILE %04x", arg1);
+    } else if (report == SPIFFS_CHECK_DELETE_ORPHANED_INDEX) {
+      printf("DELETE ORPHANED INDEX %04x", arg1);
+    } else if (report == SPIFFS_CHECK_DELETE_PAGE) {
+      printf("DELETE PAGE %04x", arg1);
+    } else if (report == SPIFFS_CHECK_FIX_INDEX) {
+      printf("FIX INDEX %04x:%04x", arg1, arg2);
+    } else if (report == SPIFFS_CHECK_FIX_LOOKUP) {
+      printf("FIX INDEX %04x:%04x", arg1, arg2);
+    } else {
+      printf("??");
+    }
+    printf("\n");
+  }
+}
 
 
 static s32_t _spiffs_hal_read(spiffs *fs, u32_t addr, u32_t size, u8_t *dst) {
@@ -65,7 +113,7 @@ int32_t fs_mount(void) {
       &cfg, (uint8_t *)_fs_work,
       (uint8_t *)_fs_desc, sizeof(_fs_desc),
       (uint8_t *)_fs_cache, sizeof(_fs_cache),
-      0);
+      _spiffs_check_cb_f);
   if (res != SPIFFS_OK && SPIFFS_errno(FS) == SPIFFS_ERR_NOT_A_FS) {
     printf("fs format\n");
     SPIFFS_clearerr(FS);
@@ -76,7 +124,7 @@ int32_t fs_mount(void) {
           &cfg, (uint8_t *)_fs_work,
           (uint8_t *)_fs_desc, sizeof(_fs_desc),
           (uint8_t *)_fs_cache, sizeof(_fs_cache),
-          0);
+          _spiffs_check_cb_f);
     }
   }
   if (res != SPIFFS_OK) {

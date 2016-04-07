@@ -293,7 +293,7 @@ static uint32_t part_ls(part_def *part, uint32_t max_len, uint32_t part_nbr, uin
     part->user = (void *)fs_opendir("/", &_ls_d);
     len = strlen(LS_PRE);
     memcpy(dst, LS_PRE, len);
-  } else if (part->nbr >= 0x10000) {
+  } else if (part->nbr == 0x10001) {
     sprintf((char *)dst,
       "<p><button onclick=\"doform()\">Format</button></p>"
       "<script>"
@@ -303,6 +303,13 @@ static uint32_t part_ls(part_def *part, uint32_t max_len, uint32_t part_nbr, uin
         "}"
       "}"
       "</script>"
+        );
+    len = strlen((char *)dst);
+  } else if (part->nbr == 0x10002) {
+    sprintf((char *)dst,
+      "<p><form action=\"fschk\">"
+      "<input type=\"submit\" value=\"FS check\">"
+      "</form></p>"
       "</body></html>"
         );
     len = strlen((char *)dst);
@@ -411,6 +418,11 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
     } else if (strcmp(req->resource, "/format") == 0) {
         // --- format and file list page
       fs_format();
+      make_partial_stream(&_stream_res, &part, part_ls, NULL);
+
+    } else if (strcmp(req->resource, "/fschk?") == 0) {
+        // --- check fs and file list page
+      fs_check();
       make_partial_stream(&_stream_res, &part, part_ls, NULL);
 
     } else if (strstr(req->resource, "/spiflash") == req->resource) {

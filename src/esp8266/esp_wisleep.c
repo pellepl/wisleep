@@ -176,6 +176,8 @@ void user_init(void) {
 
       } // if read
     } // if fs_ssid
+
+    //fs_check();
   } // if mount
 
   if (setup_ap) {
