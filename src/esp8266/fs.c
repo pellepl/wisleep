@@ -8,6 +8,8 @@
 #include "../../spiffs/src/spiffs.h"
 #include "fs.h"
 #include "octet_spiflash.h"
+#include "semphr.h"
+#include "server.h"
 
 #define FS (&__spiffs__)
 
@@ -23,21 +25,30 @@ static uint32_t _fs_desc[FS_DESCRIPTORS * 40 / sizeof(uint32_t)];
 static uint32_t _fs_cache[FS_CACHE_PAGES * (FS_PAGE_SZ + 40) / sizeof(uint32_t)];
 static uint32_t old_perc = 999;
 
+xSemaphoreHandle spiffs_mutex;
+volatile bool spiffs_locked;
+
 static void _spiffs_check_cb_f(spiffs *fs, spiffs_check_type type, spiffs_check_report report,
     u32_t arg1, u32_t arg2) {
   uint32_t perc = arg1 * 100 / 256;
   if (report == SPIFFS_CHECK_PROGRESS && old_perc != perc) {
       old_perc = perc;
-      printf("CHECK REPORT: ");
+//      printf("CHECK REPORT: ");
       switch(type) {
       case SPIFFS_CHECK_LOOKUP:
-        printf("LU "); break;
+        server_set_busy_status("FS check lookup", perc);
+ //       printf("LU ");
+        break;
       case SPIFFS_CHECK_INDEX:
-        printf("IX "); break;
+        server_set_busy_status("FS check index", perc);
+ //       printf("IX ");
+        break;
       case SPIFFS_CHECK_PAGE:
-        printf("PA "); break;
+        server_set_busy_status("FS check pages", perc);
+//        printf("PA ");
+        break;
       }
-      printf("%i%%\n", perc);
+//      printf("%i%%\n", perc);
   }
   if (report != SPIFFS_CHECK_PROGRESS) {
     printf("   check: ");
@@ -89,6 +100,12 @@ static s32_t _spiffs_hal_erase(spiffs *fs, u32_t addr, u32_t size) {
   WDT.FEED = WDT_FEED_MAGIC;
   sdk_SpiFlashOpResult res = sdk_spi_flash_erase_sector(addr / SPI_FLASH_SEC_SIZE);
   return res == SPI_FLASH_RESULT_OK ? SPIFFS_OK : -1;
+}
+
+
+void fs_init(void) {
+  spiffs_locked = false;
+  spiffs_mutex = xSemaphoreCreateMutex();
 }
 
 int32_t fs_mount(void) {

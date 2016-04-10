@@ -13,6 +13,7 @@
 #include "../uweb/src/uweb_http.h"
 #include "octet_spiflash.h"
 #include "fs.h"
+#include "systasks.h"
 
 //#define RAW_SERV // TODO
 //#define NETCONN_SERV
@@ -34,6 +35,9 @@ typedef struct part_def_s {
 static uint32_t _upload_sz;
 static spiffs_file _upload_fd = 0;
 static uweb_data_stream _stream_tcp, _stream_res;
+static char *_busy_title;
+static int _busy_progress;
+static volatile uint8_t _server_busy_claims;
 
 static int get_errno(int sock_fd) {
   int error;
@@ -279,6 +283,22 @@ static uint32_t part_upload(part_def *part, uint32_t max_len, uint32_t part_nbr,
   return len;
 }
 
+static uint32_t part_busy(part_def *part, uint32_t max_len, uint32_t part_nbr, uint8_t *dst) {
+  uint32_t len = 0;
+  if (part->nbr == 0) {
+    sprintf((char *)dst,
+        "<!DOCTYPE html>"
+        "<html><body onload=\"setTimeout('location.reload(true);',500);\">"
+        "<h2 align=\"center\">%s</h2>"
+        "<progress align=\"center\" value=\"%i\" max=\"100\"></progress>"
+        "</body></html>",
+        _busy_title, _busy_progress
+    );
+    len = strlen((char *)dst);
+    close_partial_stream(part);
+  }
+  return len;
+}
 
 static spiffs_DIR _ls_d;
 
@@ -295,21 +315,25 @@ static uint32_t part_ls(part_def *part, uint32_t max_len, uint32_t part_nbr, uin
     memcpy(dst, LS_PRE, len);
   } else if (part->nbr == 0x10001) {
     sprintf((char *)dst,
-      "<p><button onclick=\"doform()\">Format</button></p>"
-      "<script>"
-      "function doform() {"
-        "if (confirm(\"Really format?\")==true) {"
-          "window.location.href='format';"
-        "}"
-      "}"
-      "</script>"
+        "<table border=0><tr><td>"
+        "<form action=\"fschk\">"
+        "<input type=\"submit\" value=\"FS check\">"
+        "</form>"
+        "</td>"
         );
     len = strlen((char *)dst);
   } else if (part->nbr == 0x10002) {
     sprintf((char *)dst,
-      "<p><form action=\"fschk\">"
-      "<input type=\"submit\" value=\"FS check\">"
-      "</form></p>"
+      "<td>"
+        "<button onclick=\"doform()\">Format</button>"
+        "<script>"
+        "function doform() {"
+          "if (confirm(\"Really format?\")==true) {"
+            "window.location.href='format';"
+          "}"
+        "}"
+        "</script>"
+      "</td></tr></table>"
       "</body></html>"
         );
     len = strlen((char *)dst);
@@ -366,15 +390,21 @@ static const char *DEF_INDEX =
         "<input type=\"submit\" value=\"Upload\" name=\"submit\">"
       "</fieldset>"
     "</form>"
-    "<p><a href=\"ls\">List files</a></p>"
+    "<table border=0><tr>"
+      "<td><form action=\"ls\">"
+      "<input type=\"submit\" value=\"List Files\">"
+      "</form></td>"
+      "<td><form action=\"test\">"
+      "<input type=\"submit\" value=\"Test\">"
+      "</form></td>"
+    "</tr></table>"
     "</body></html>"
         ;
 static const char *NOTFOUND =
     "<!DOCTYPE html>"
     "<html><body>"
-    "404 Not found. Bah."
+    "<h1 align=\"center\">404 Not found</h1>"
     "</body></html>";
-
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -386,8 +416,20 @@ static part_def part;
 static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
     uweb_http_status *http_status, char *content_type,
     char **extra_headers) {
+  if (server_is_busy()) {
+    if (req->chunk_nbr == 0) {
+      printf("req BUSY %s\n", &req->resource[1]);
+      make_partial_stream(&_stream_res, &part, part_busy, NULL);
+    }
+
+    *res = &_stream_res;
+
+    return UWEB_CHUNKED;
+  }
+
+
   if (req->chunk_nbr == 0) {
-    printf("opening %s\n", &req->resource[1]);
+    printf("req %s\n", &req->resource[1]);
     make_null_stream(&_stream_res);
     WDT.FEED = WDT_FEED_MAGIC;
 
@@ -401,13 +443,18 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
         make_file_stream(&_stream_res, fd);
       }
 
-    } else if (strcmp(req->resource, "/uploadfile") == 0) {
+    } else if (strstr(req->resource, "/uploadfile") == req->resource) {
         // --- uploading page
       make_partial_stream(&_stream_res, &part, part_upload, NULL);
 
-    } else if (strcmp(req->resource, "/ls") == 0) {
+    } else if (strstr(req->resource, "/ls") == req->resource) {
         // --- file list page
       make_partial_stream(&_stream_res, &part, part_ls, NULL);
+
+    } else if (strstr(req->resource, "/test") == req->resource) {
+        // --- test
+      make_char_stream(&_stream_res, DEF_INDEX);
+      systask_call(SYS_TEST);
 
     } else if (strstr(req->resource, "/rm?name=") == req->resource) {
         // --- rm file and file list page
@@ -415,15 +462,16 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
       fs_remove(fname);
       make_partial_stream(&_stream_res, &part, part_ls, NULL);
 
-    } else if (strcmp(req->resource, "/format") == 0) {
+    } else if (strstr(req->resource, "/format") == req->resource) {
         // --- format and file list page
       fs_format();
       make_partial_stream(&_stream_res, &part, part_ls, NULL);
 
-    } else if (strcmp(req->resource, "/fschk?") == 0) {
+    } else if (strstr(req->resource, "/fschk") == req->resource) {
         // --- check fs and file list page
-      fs_check();
-      make_partial_stream(&_stream_res, &part, part_ls, NULL);
+      systask_call(SYS_FS_CHECK);
+      //make_partial_stream(&_stream_res, &part, part_ls, NULL);
+      make_partial_stream(&_stream_res, &part, part_busy, NULL);
 
     } else if (strstr(req->resource, "/spiflash") == req->resource) {
       // --- read spiflash
@@ -512,6 +560,23 @@ static void uweb_data(uweb_request_header *req, uweb_data_type type,
     }
   }
 
+}
+
+bool server_is_busy(void) {
+  return _server_busy_claims > 0;
+}
+
+void server_claim_busy(void) {
+  _server_busy_claims++;
+}
+
+void server_release_busy(void) {
+  _server_busy_claims--;
+}
+
+void server_set_busy_status(const char *str, int progress) {
+  _busy_title = str;
+  _busy_progress = progress;
 }
 
 #ifdef NETCONN_SERV

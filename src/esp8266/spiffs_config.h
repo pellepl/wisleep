@@ -14,6 +14,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include "FreeRTOS.h"
+#include "semphr.h"
+#include "server.h"
+
+extern xSemaphoreHandle spiffs_mutex;
+extern volatile bool spiffs_locked;
 
 typedef uint8_t  u8_t;
 typedef int8_t   s8_t;
@@ -38,8 +44,18 @@ typedef int32_t  s32_t;
 #define SPIFFS_COPY_BUFFER_STACK        (128)
 #define SPIFFS_USE_MAGIC                (1)
 #define SPIFFS_USE_MAGIC_LENGTH         (1)
-#define SPIFFS_LOCK(fs)
-#define SPIFFS_UNLOCK(fs)
+#define SPIFFS_LOCK(fs)  \
+  do { \
+    server_claim_busy(); \
+    (void)xSemaphoreTake(spiffs_mutex, portMAX_DELAY); \
+    spiffs_locked = true; \
+  } while (0)
+#define SPIFFS_UNLOCK(fs) \
+    do { \
+      spiffs_locked = false; \
+      (void)xSemaphoreGive(spiffs_mutex); \
+      server_release_busy(); \
+    } while (0)
 #define SPIFFS_SINGLETON                0
 #define SPIFFS_GC_HEUR_W_DELET          (5)
 #define SPIFFS_GC_HEUR_W_USED           (-1)

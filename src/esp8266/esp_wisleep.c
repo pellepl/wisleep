@@ -148,7 +148,11 @@ void user_init(void) {
   struct sdk_station_config config;
   bool setup_ap = true;
 
+  systask_init();
+
+  fs_init();
   if (fs_mount() >= 0) {
+#if 0
     spiffs_DIR d;
     struct spiffs_dirent e;
     struct spiffs_dirent *pe = &e;
@@ -158,7 +162,7 @@ void user_init(void) {
       printf("%s [%04x] size:%i\n", pe->name, pe->obj_id, pe->size);
     }
     fs_closedir(&d);
-
+#endif
     spiffs_file fd_ssid = fs_open(".ssid", SPIFFS_RDONLY, 0);
     if (fd_ssid > 0) {
       if (fs_read(fd_ssid, (uint8_t *)ap_cred, sizeof(ap_cred)) > 0) {

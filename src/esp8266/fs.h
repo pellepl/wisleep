@@ -23,6 +23,7 @@
 
 extern spiffs __spiffs__;
 
+void fs_init(void);
 int32_t fs_mount(void);
 #define fs_unmount(void) \
 SPIFFS_unmount(&__spiffs__)

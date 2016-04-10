@@ -9,6 +9,7 @@ PROGRAM_SRC_FILES = \
 	server.c \
 	fs.c \
 	octet_spiflash.c \
+	systasks.c \
 	../umac/umac.c \
 	../uweb/src/uweb.c \
 	../uweb/src/uweb_codec.c \

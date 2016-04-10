@@ -17,9 +17,13 @@
 #include <stdio.h>
 #include "FreeRTOS.h"
 #include "task.h"
-
 #include "espressif/esp_common.h"
 
 void server_task(void *pvParameters);
+
+bool server_is_busy(void);
+void server_claim_busy(void);
+void server_release_busy(void);
+void server_set_busy_status(const char *str, int progress);
 
 #endif /* _ESP8266_SERVER_H_ */
