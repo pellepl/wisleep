@@ -453,8 +453,9 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
 
     } else if (strstr(req->resource, "/test") == req->resource) {
         // --- test
-      make_char_stream(&_stream_res, DEF_INDEX);
-      systask_call(SYS_TEST);
+      //systask_call(SYS_TEST);
+      systask_call(SYS_WIFI_SCAN);
+      make_partial_stream(&_stream_res, &part, part_busy, NULL);
 
     } else if (strstr(req->resource, "/rm?name=") == req->resource) {
         // --- rm file and file list page

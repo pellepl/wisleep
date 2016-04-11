@@ -17,6 +17,7 @@
 typedef enum {
   SYS_FS_FORMAT = 1,
   SYS_FS_CHECK,
+  SYS_WIFI_SCAN,
   SYS_TEST,
 } systask_id;
 
