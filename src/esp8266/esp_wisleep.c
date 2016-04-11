@@ -19,6 +19,7 @@
 #include "fs.h"
 
 #include "../umac/umac.h"
+#include "systasks.h"
 
 static umac um;
 static unsigned char rx_buf[768];
@@ -182,6 +183,8 @@ void user_init(void) {
     } // if fs_ssid
 
     //fs_check();
+
+    fs_remove(SYSTASK_AP_SCAN_FILENAME);
   } // if mount
 
   if (setup_ap) {

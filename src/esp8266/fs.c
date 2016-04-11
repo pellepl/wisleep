@@ -8,8 +8,11 @@
 #include "../../spiffs/src/spiffs.h"
 #include "fs.h"
 #include "octet_spiflash.h"
+#include "FreeRTOS.h"
+#include "task.h"
 #include "semphr.h"
 #include "server.h"
+
 
 #define FS (&__spiffs__)
 
@@ -33,21 +36,19 @@ static void _spiffs_check_cb_f(spiffs *fs, spiffs_check_type type, spiffs_check_
   uint32_t perc = arg1 * 100 / 256;
   if (report == SPIFFS_CHECK_PROGRESS && old_perc != perc) {
       old_perc = perc;
-//      printf("CHECK REPORT: ");
+      uint32_t sumperc = perc;
       switch(type) {
       case SPIFFS_CHECK_LOOKUP:
-        server_set_busy_status("FS check lookup", perc);
- //       printf("LU ");
+        sumperc = perc / 3;
         break;
       case SPIFFS_CHECK_INDEX:
-        server_set_busy_status("FS check index", perc);
- //       printf("IX ");
+        sumperc = 33 + perc / 3;
         break;
       case SPIFFS_CHECK_PAGE:
-        server_set_busy_status("FS check pages", perc);
-//        printf("PA ");
+        sumperc = 67 + perc / 3;
         break;
       }
+      server_set_busy_status("FS check", sumperc);
 //      printf("%i%%\n", perc);
   }
   if (report != SPIFFS_CHECK_PROGRESS) {
@@ -79,6 +80,7 @@ static void _spiffs_check_cb_f(spiffs *fs, spiffs_check_type type, spiffs_check_
     }
     printf("\n");
   }
+  taskYIELD();
 }
 
 

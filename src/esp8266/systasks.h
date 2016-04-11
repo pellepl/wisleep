@@ -14,6 +14,8 @@
 #include "task.h"
 #include "queue.h"
 
+#define SYSTASK_AP_SCAN_FILENAME ".apscan"
+
 typedef enum {
   SYS_FS_FORMAT = 1,
   SYS_FS_CHECK,
@@ -22,6 +24,6 @@ typedef enum {
 } systask_id;
 
 void systask_init(void);
-void systask_call(systask_id task_id);
+void systask_call(systask_id task_id, bool claim);
 
 #endif /* _ESP8266_SYSTASKS_H_ */

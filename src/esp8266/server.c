@@ -35,7 +35,7 @@ typedef struct part_def_s {
 static uint32_t _upload_sz;
 static spiffs_file _upload_fd = 0;
 static uweb_data_stream _stream_tcp, _stream_res;
-static char *_busy_title;
+static const char *_busy_title;
 static int _busy_progress;
 static volatile uint8_t _server_busy_claims;
 
@@ -44,6 +44,21 @@ static int get_errno(int sock_fd) {
   uint32_t optlen = sizeof(error);
   (void)lwip_getsockopt(sock_fd, SOL_SOCKET, SO_ERROR, &error, &optlen);
   return error;
+}
+
+static bool strendnocase(const char *str, const char *pfx) {
+  int str_len = strlen(str);
+  int pfx_len = strlen(pfx);
+  if (str_len < pfx_len) return false;
+
+  while (pfx_len) {
+    char str_c = str[--str_len];
+    char pfx_c = pfx[--pfx_len];
+    if (str_c >= 'a' && str_c <= 'z') str_c = str_c - 'a' + 'A';
+    if (pfx_c >= 'a' && pfx_c <= 'z') pfx_c = pfx_c - 'a' + 'A';
+    if (str_c != pfx_c) return false;
+  }
+  return true;
 }
 
 #ifdef SOCK_SERV
@@ -66,12 +81,16 @@ static int32_t sockstr_write(UW_STREAM str, uint8_t *src, uint32_t len) {
   }
   return l;
 }
+static void sockstr_close(UW_STREAM str) {
+  close((intptr_t)str->user);
+}
 static UW_STREAM make_tcp_stream(UW_STREAM str, int sockfd) {
   str->total_sz = -1;
   str->avail_sz = 256;
   str->user = (void *)((intptr_t)sockfd);
   str->read = sockstr_read;
   str->write = sockstr_write;
+  str->close = sockstr_close;
   return str;
 }
 #endif // SOCK_SERV
@@ -258,42 +277,24 @@ static UW_STREAM make_file_stream(UW_STREAM str, spiffs_file fd) {
 ///////////////////////////////////////////////////////////////////////////////
 
 
-static uint32_t part_upload(part_def *part, uint32_t max_len, uint32_t part_nbr, uint8_t *dst) {
-  uint32_t len = 0;
-  if (part->nbr == 0) {
-    if (_upload_fd) {
-      sprintf((char *)dst,
-        "<!DOCTYPE html>"
-        "<html><body onload=\"setTimeout('location.reload(true);',1000);\">"
-        "<fieldset>"
-          "<legend>File upload</legend>"
-          "%i bytes"
-        "</fieldset>"
-        "</body></html>", _upload_sz
-       );
-    } else {
-      sprintf((char *)dst,
-        "<!DOCTYPE html>"
-        "<html><body onload=\"window.location.href ='ls';\">"
-        "</body></html>");
-    }
-    len = strlen((char *)dst);
-    close_partial_stream(part);
-  }
-  return len;
-}
-
 static uint32_t part_busy(part_def *part, uint32_t max_len, uint32_t part_nbr, uint8_t *dst) {
   uint32_t len = 0;
   if (part->nbr == 0) {
+    char sprogress[32];
+    if (_busy_progress >= 0) {
+      sprintf(sprogress, "value=\"%i\"", _busy_progress);
+    } else {
+      memset(sprogress, 0, sizeof(sprogress));
+    }
     sprintf((char *)dst,
         "<!DOCTYPE html>"
-        "<html><body onload=\"setTimeout('location.reload(true);',500);\">"
+        "<html>"
+        "<style>progress[value]{width:75%%;}</style>"
+        "<body onload=\"setTimeout('location.reload(true);',500);\">"
         "<h2 align=\"center\">%s</h2>"
-        "<progress align=\"center\" value=\"%i\" max=\"100\"></progress>"
+        "<div align=\"middle\"><progress %s max=\"100\"></progress></div>"
         "</body></html>",
-        _busy_title, _busy_progress
-    );
+        _busy_title, sprogress);
     len = strlen((char *)dst);
     close_partial_stream(part);
   }
@@ -308,14 +309,15 @@ static uint32_t part_ls(part_def *part, uint32_t max_len, uint32_t part_nbr, uin
     const char *LS_PRE =
         "<!DOCTYPE html>"
         "<html><body>"
-        "<table style=\"border:1px solid\">"
-        "<tr><td><b>NAME</b></td><td><b>SIZE</b></td><td><b>OBJID</b></td><td><b>DELETE</b></td></tr>";
+        "<div align=\"middle\"><table style=\"border:1px solid;font-family:courier;border-spacing:8px;\">"
+        "<tr><td><b>NAME</b></td><td><b>SIZE</b></td><td><b>OBJID</b></td><td><b>RM</b></td></tr>";
     part->user = (void *)fs_opendir("/", &_ls_d);
     len = strlen(LS_PRE);
     memcpy(dst, LS_PRE, len);
   } else if (part->nbr == 0x10001) {
     sprintf((char *)dst,
-        "<table border=0><tr><td>"
+        "<div align=\"middle\"><table style=\"border:0px;border-spacing:8px;\">"
+        "<tr><td>"
         "<form action=\"fschk\">"
         "<input type=\"submit\" value=\"FS check\">"
         "</form>"
@@ -333,7 +335,7 @@ static uint32_t part_ls(part_def *part, uint32_t max_len, uint32_t part_nbr, uin
           "}"
         "}"
         "</script>"
-      "</td></tr></table>"
+      "</td></tr></table></div>"
       "</body></html>"
         );
     len = strlen((char *)dst);
@@ -358,7 +360,7 @@ static uint32_t part_ls(part_def *part, uint32_t max_len, uint32_t part_nbr, uin
       sprintf((char *)dst,
         "<tr><td colspan=\"4\">&nbsp;</td></tr>"
         "<tr><td>USED</td><td>%i</td><td>TOTAL</td><td>%i</td></tr>"
-        "</table>",
+        "</table></div>",
       used, total);
       len = strlen((char *)dst);
       part->nbr = 0x10000;
@@ -367,6 +369,63 @@ static uint32_t part_ls(part_def *part, uint32_t max_len, uint32_t part_nbr, uin
   return len;
 }
 
+static uint32_t part_aplist(part_def *part, uint32_t max_len, uint32_t part_nbr, uint8_t *dst) {
+  uint32_t len = 0;
+  if (part->nbr == 0) {
+    const char *LS_PRE =
+        "<!DOCTYPE html>"
+        "<html><body>"
+        "<div align=\"middle\"><table style=\"border:1px solid;font-family:courier;border-spacing:8px;\">"
+        "<tr><td><b>MAC</b></td><td><b>SSID</b></td><td><b>CH</b></td><td><b>RSSI</b></td></tr>";
+    part->user = (void *)(intptr_t)fs_open(SYSTASK_AP_SCAN_FILENAME, SPIFFS_O_RDONLY, 0);
+    len = strlen(LS_PRE);
+    memcpy(dst, LS_PRE, len);
+  } else if (part->nbr == 0x10001) {
+    sprintf((char *)dst,
+        "<div align=\"middle\"><table style=\"border:0px;border-spacing:8px;\">"
+        "<tr><td>"
+        "<form action=\"scan\">"
+        "<input type=\"submit\" value=\"AP Scan\">"
+        "</form>"
+        "</td>"
+        );
+    len = strlen((char *)dst);
+  } else if (part->nbr == 0x10002) {
+    sprintf((char *)dst,
+      "</tr></table></div>"
+      "</body></html>"
+        );
+    len = strlen((char *)dst);
+    close_partial_stream(part);
+  } else {
+    spiffs_file fd = (spiffs_file)(intptr_t)part->user;
+    struct sdk_bss_info bss_info;
+    if (fd > 0 &&
+        fs_read(fd, &bss_info, sizeof(struct sdk_bss_info)) == sizeof(struct sdk_bss_info)) {
+      sprintf((char *)dst,
+          "<tr>"
+          "<td>%02x:%02x:%02x:%02x:%02x:%02x</td>"
+          "<td>%s</td>"
+          "<td>%i</td>"
+          "<td>%i</td>"
+          "</tr>",
+          bss_info.bssid[0], bss_info.bssid[1], bss_info.bssid[2], bss_info.bssid[3], bss_info.bssid[4], bss_info.bssid[5],
+          bss_info.ssid,
+          bss_info.channel,
+          bss_info.rssi
+          );
+      len = strlen((char *)dst);
+    } else {
+      fs_close(fd);
+      part->user = 0;
+      sprintf((char *)dst,
+        "</table></div>");
+      len = strlen((char *)dst);
+      part->nbr = 0x10000;
+    }
+  }
+  return len;
+}
 
 static const char *DEF_INDEX =
     "<!DOCTYPE html>"
@@ -390,14 +449,18 @@ static const char *DEF_INDEX =
         "<input type=\"submit\" value=\"Upload\" name=\"submit\">"
       "</fieldset>"
     "</form>"
-    "<table border=0><tr>"
+    "<div align=\"middle\"><table style=\"border:0px;border-spacing:8px;\">"
+    "<tr>"
       "<td><form action=\"ls\">"
       "<input type=\"submit\" value=\"List Files\">"
+      "</form></td>"
+      "<td><form action=\"scan\">"
+      "<input type=\"submit\" value=\"AP Scan\">"
       "</form></td>"
       "<td><form action=\"test\">"
       "<input type=\"submit\" value=\"Test\">"
       "</form></td>"
-    "</tr></table>"
+    "</tr></table></div>"
     "</body></html>"
         ;
 static const char *NOTFOUND =
@@ -416,6 +479,8 @@ static part_def part;
 static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
     uweb_http_status *http_status, char *content_type,
     char **extra_headers) {
+
+  // if server is busy, load busy page
   if (server_is_busy()) {
     if (req->chunk_nbr == 0) {
       printf("req BUSY %s\n", &req->resource[1]);
@@ -427,7 +492,7 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
     return UWEB_CHUNKED;
   }
 
-
+  // server idle, handle request
   if (req->chunk_nbr == 0) {
     printf("req %s\n", &req->resource[1]);
     make_null_stream(&_stream_res);
@@ -445,7 +510,11 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
 
     } else if (strstr(req->resource, "/uploadfile") == req->resource) {
         // --- uploading page
-      make_partial_stream(&_stream_res, &part, part_upload, NULL);
+      //make_partial_stream(&_stream_res, &part, part_ls, NULL);
+      return UWEB_return_redirect(req, "ls");
+
+    } else if (strstr(req->resource, "/dir") == req->resource) {
+      return UWEB_return_redirect(req, "http://esp.pelleplutt.com/ls");
 
     } else if (strstr(req->resource, "/ls") == req->resource) {
         // --- file list page
@@ -453,26 +522,34 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
 
     } else if (strstr(req->resource, "/test") == req->resource) {
         // --- test
-      //systask_call(SYS_TEST);
-      systask_call(SYS_WIFI_SCAN);
-      make_partial_stream(&_stream_res, &part, part_busy, NULL);
+      systask_call(SYS_TEST, true);
+      return UWEB_return_redirect(req, "index.html");
+
+    } else if (strstr(req->resource, "/scan") == req->resource) {
+        // --- scan APs
+      systask_call(SYS_WIFI_SCAN, true);
+      return UWEB_return_redirect(req, "aplist");
+
+    } else if (strstr(req->resource, "/aplist") == req->resource) {
+        // --- list APs
+      make_partial_stream(&_stream_res, &part, part_aplist, NULL);
 
     } else if (strstr(req->resource, "/rm?name=") == req->resource) {
         // --- rm file and file list page
       char *fname = (char *)&req->resource[9]; // strlen(/rm?name=)
       fs_remove(fname);
-      make_partial_stream(&_stream_res, &part, part_ls, NULL);
+      //make_partial_stream(&_stream_res, &part, part_ls, NULL);
+      return UWEB_return_redirect(req, "ls");
 
     } else if (strstr(req->resource, "/format") == req->resource) {
         // --- format and file list page
-      fs_format();
-      make_partial_stream(&_stream_res, &part, part_ls, NULL);
+      systask_call(SYS_FS_FORMAT, true);
+      return UWEB_return_redirect(req, "ls");
 
     } else if (strstr(req->resource, "/fschk") == req->resource) {
         // --- check fs and file list page
-      systask_call(SYS_FS_CHECK);
-      //make_partial_stream(&_stream_res, &part, part_ls, NULL);
-      make_partial_stream(&_stream_res, &part, part_busy, NULL);
+      systask_call(SYS_FS_CHECK, true);
+      return UWEB_return_redirect(req, "ls");
 
     } else if (strstr(req->resource, "/spiflash") == req->resource) {
       // --- read spiflash
@@ -505,8 +582,38 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
         *http_status = S404_NOT_FOUND;
       } else {
         printf("opening fs file %s (fd=%i)\n", fname, fd);
-        if (strstr(fname, ".jpg") || strstr(fname, ".jpeg") || strstr(fname, ".JPG") || strstr(fname, ".JPEG")) {
+        if (strendnocase(fname, ".jpg") || strendnocase(fname, ".jpeg")) {
           sprintf(content_type, "image/jpeg");
+        }
+        else if (strendnocase(fname, ".gif")) {
+          sprintf(content_type, "image/gif");
+        }
+        else if (strendnocase(fname, ".png")) {
+          sprintf(content_type, "image/png");
+        }
+        else if (strendnocase(fname, ".bmp")) {
+          sprintf(content_type, "image/bmp");
+        }
+        else if (strendnocase(fname, ".tiff")) {
+          sprintf(content_type, "image/tiff");
+        }
+        else if (strendnocase(fname, ".webp")) {
+          sprintf(content_type, "image/webp");
+        }
+        else if (strendnocase(fname, ".ico")) {
+          sprintf(content_type, "image/x-icon");
+        }
+        else if (strendnocase(fname, ".css")) {
+          sprintf(content_type, "text/css");
+        }
+        else if (strendnocase(fname, ".pdf")) {
+          sprintf(content_type, "application/pdf");
+        }
+        else if (strendnocase(fname, ".wav")) {
+          sprintf(content_type, "audio/x-wav");
+        }
+        else if (strendnocase(fname, ".js")) {
+          sprintf(content_type, "application/javascript");
         }
         make_file_stream(&_stream_res, fd);
       }
