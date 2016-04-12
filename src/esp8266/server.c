@@ -320,7 +320,7 @@ static uint32_t part_ls(part_def *part, uint32_t max_len, uint32_t part_nbr, uin
         "<div align=\"middle\"><table style=\"border:0px;border-spacing:8px;\">"
         "<tr><td>"
         "<form action=\"fschk\">"
-        "<input type=\"submit\" value=\"FS check\">"
+        "<input type=\"submit\" value=\"FS check\"/>"
         "</form>"
         "</td>"
         );
@@ -387,7 +387,7 @@ static uint32_t part_aplist(part_def *part, uint32_t max_len, uint32_t part_nbr,
         "<div align=\"middle\"><table style=\"border:0px;border-spacing:8px;\">"
         "<tr><td>"
         "<form action=\"scan\">"
-        "<input type=\"submit\" value=\"AP Scan\">"
+        "<input type=\"submit\" value=\"AP Scan\"/>"
         "</form>"
         "</td>"
         );
@@ -437,30 +437,30 @@ static const char *DEF_INDEX =
     "<form action=\"spiflash\" method=\"get\">"
       "<fieldset>"
         "<legend>Dump spi flash</legend>"
-        "Address:<br>"
-        "<input type=\"text\" name=\"addr\" value=\"0x00000000\"><br>"
-        "Length:<br>"
-        "<input type=\"text\" name=\"len\" value=\"1024\"><br><br>"
-        "<input type=\"submit\" value=\"Dump\">"
+        "Address:<br/>"
+        "<input type=\"text\" name=\"addr\" value=\"0x00000000\"/><br/>"
+        "Length:<br/>"
+        "<input type=\"text\" name=\"len\" value=\"1024\"/><br/><br/>"
+        "<input type=\"submit\" value=\"Dump\"/>"
       "</fieldset>"
     "</form>"
     "<form action=\"uploadfile\" method=\"post\" enctype=\"multipart/form-data\">"
       "<fieldset>"
         "<legend>Upload file</legend>"
-        "<input type=\"file\" name=\"upfile\" id=\"upfile\">"
-        "<input type=\"submit\" value=\"Upload\" name=\"submit\">"
+        "<input type=\"file\" name=\"upfile\" id=\"upfile\"/>"
+        "<input type=\"submit\" value=\"Upload\" name=\"submit\"/>"
       "</fieldset>"
     "</form>"
     "<div align=\"middle\"><table style=\"border:0px;border-spacing:8px;\">"
     "<tr>"
       "<td><form action=\"ls\">"
-      "<input type=\"submit\" value=\"List Files\">"
+      "<input type=\"submit\" value=\"List Files\"/>"
       "</form></td>"
       "<td><form action=\"scan\">"
-      "<input type=\"submit\" value=\"AP Scan\">"
+      "<input type=\"submit\" value=\"AP Scan\"/>"
       "</form></td>"
       "<td><form action=\"test\">"
-      "<input type=\"submit\" value=\"Test\">"
+      "<input type=\"submit\" value=\"Test\"/>"
       "</form></td>"
     "</tr></table></div>"
     "</body></html>"
@@ -497,7 +497,7 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
 
   // server idle, handle request
   if (req->chunk_nbr == 0) {
-    printf("req %s\n", &req->resource[1]);
+    printf("req \"%s\"\n", &req->resource[1]);
     make_null_stream(&_stream_res);
     WDT.FEED = WDT_FEED_MAGIC;
 
@@ -582,6 +582,7 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
       if (fname[0] == '.') fname++;
       spiffs_file fd = fs_open(fname, SPIFFS_RDONLY, 0);
       if (fd < 0) {
+        printf("fs file %s not found (err %i)\n", fname, fs_errno());
         make_char_stream(&_stream_res, NOTFOUND);
         *http_status = S404_NOT_FOUND;
       } else {
