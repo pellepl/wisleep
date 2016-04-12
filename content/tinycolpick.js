@@ -1,0 +1,1 @@
+tinycolorpicker/lib/tinycolorpicker.min.js

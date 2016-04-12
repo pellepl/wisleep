@@ -1,0 +1,36 @@
+<html>
+<head>
+  <link rel="stylesheet" href="tinycolpick.css" type="text/css" media="screen"/>
+
+  <!-- build:js tinycolorpicker.js -->
+  <script type="text/javascript" src="tinycolpick.js"></script>
+  <!-- /build -->
+  <script type="text/javascript">
+    var picker;
+    
+    window.onload = function()
+    {
+      var $picker = document.getElementById("colorPicker");
+      picker = tinycolorpicker($picker);
+    }
+    
+    function setcol() {
+      window.location.href=window.location.href.toString().split(window.location.host)[1]+'?col='+picker.colorHex.substring(1);
+    }
+  </script>
+</head>
+<body>
+  <h1><a href="/">wisleep</a></h1>
+  <form action="setcol" method="post">
+  <div id="colorPicker">
+    <a class="color"><div class="colorInner"></div></a>
+    <div class="track"></div>
+    <ul class="dropdown"><li></li></ul>
+    <input type="hidden" class="colorInput"/>
+  </div>
+  </form>
+  <div align="middle">
+  <button onclick="setcol()">Set Color</button>
+  </div>
+</body>
+</html>

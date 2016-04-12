@@ -1,0 +1,66 @@
+/* COLORPICKER 1 EXAMPLE */
+#colorPicker
+{
+    width:          45px;
+    height:         45px;
+    position: relative;
+    clear: both;
+    margin: 100px auto 45px;
+}
+
+#colorPicker .track {
+    background:     #EFEFEF url(colsel.png) no-repeat 100% 100%;
+    height:         200px;
+    width:          200px;
+    padding:        8px;
+    position:       absolute;
+    cursor:         crosshair;
+    float:          left;
+    left:           -84px;
+    top:            -84px;
+    display:        none;
+    border:         1px solid #ccc;
+    z-index:        10;
+    -webkit-border-radius: 200px;
+    -moz-border-radius: 200px;
+    border-radius: 200px;
+}
+
+#colorPicker .color {
+    width:          48px;
+    height:         48px;
+    padding:        1px;
+    border:         1px solid #ccc;
+    display:        block;
+    position:       relative;
+    z-index:        11;
+    background-color: #EFEFEF;
+    -webkit-border-radius: 50px;
+    -moz-border-radius: 50px;
+    border-radius: 50px;
+    cursor: pointer;
+}
+
+#colorPicker .colorInner {
+    width:          48px;
+    height:         48px;
+    -webkit-border-radius: 50px;
+    -moz-border-radius: 50px;
+    border-radius: 50px;
+}
+
+#colorPicker .dropdown {
+    list-style: none;
+    display: none;
+    width: 50px;
+    position: absolute;
+    top: 50px;
+    border: 1px solid #ccc;
+    left: 0;
+    z-index: 1000;
+}
+
+#colorPicker .dropdown li{
+    height: 50px;
+    cursor: pointer;
+}

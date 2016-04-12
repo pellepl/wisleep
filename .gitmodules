@@ -10,3 +10,6 @@
 [submodule "spiffs"]
 	path = spiffs
 	url = https://github.com/pellepl/spiffs.git
+[submodule "content/tinycolorpicker"]
+	path = content/tinycolorpicker
+	url = https://github.com/wieringen/tinycolorpicker
