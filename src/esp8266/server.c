@@ -578,8 +578,17 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
 
     } else {
       // --- unknown resource
-      char *fname = &req->resource[1];
-      if (fname[0] == '.') fname++;
+      char fname[SPIFFS_OBJ_NAME_LEN+1];
+      memset(fname, 0, SPIFFS_OBJ_NAME_LEN+1);
+      char *resource_str = &req->resource[1]; // skip '/'
+      if (resource_str[0] == '.') resource_str++;
+      char *param_ix = strchr(resource_str, '?');
+      if (param_ix) {
+        int len = (ptrdiff_t)(param_ix - resource_str);
+        strncpy(fname, resource_str, SPIFFS_OBJ_NAME_LEN < len ? SPIFFS_OBJ_NAME_LEN : len);
+      } else {
+        strncpy(fname, resource_str, SPIFFS_OBJ_NAME_LEN);
+      }
       spiffs_file fd = fs_open(fname, SPIFFS_RDONLY, 0);
       if (fd < 0) {
         printf("fs file %s not found (err %i)\n", fname, fs_errno());

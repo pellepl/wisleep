@@ -8,14 +8,15 @@
   <script type="text/javascript">
     var picker;
     
-    window.onload = function()
-    {
+    window.onload = function() {
       var $picker = document.getElementById("colorPicker");
       picker = tinycolorpicker($picker);
     }
     
     function setcol() {
-      window.location.href=window.location.href.toString().split(window.location.host)[1]+'?col='+picker.colorHex.substring(1);
+      var xmlHttp = new XMLHttpRequest();
+      xmlHttp.open("GET", window.location.pathname + '?col=' + picker.colorHex.substring(1), true); 
+      xmlHttp.send(null);
     }
   </script>
 </head>
