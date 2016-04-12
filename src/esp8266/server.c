@@ -309,6 +309,7 @@ static uint32_t part_ls(part_def *part, uint32_t max_len, uint32_t part_nbr, uin
     const char *LS_PRE =
         "<!DOCTYPE html>"
         "<html><body>"
+        "<h1><a href=\"/\">wisleep</a></h1>"
         "<div align=\"middle\"><table style=\"border:1px solid;font-family:courier;border-spacing:8px;\">"
         "<tr><td><b>NAME</b></td><td><b>SIZE</b></td><td><b>OBJID</b></td><td><b>RM</b></td></tr>";
     part->user = (void *)fs_opendir("/", &_ls_d);
@@ -375,6 +376,7 @@ static uint32_t part_aplist(part_def *part, uint32_t max_len, uint32_t part_nbr,
     const char *LS_PRE =
         "<!DOCTYPE html>"
         "<html><body>"
+        "<h1><a href=\"/\">wisleep</a></h1>"
         "<div align=\"middle\"><table style=\"border:1px solid;font-family:courier;border-spacing:8px;\">"
         "<tr><td><b>MAC</b></td><td><b>SSID</b></td><td><b>CH</b></td><td><b>RSSI</b></td></tr>";
     part->user = (void *)(intptr_t)fs_open(SYSTASK_AP_SCAN_FILENAME, SPIFFS_O_RDONLY, 0);
@@ -430,7 +432,7 @@ static uint32_t part_aplist(part_def *part, uint32_t max_len, uint32_t part_nbr,
 static const char *DEF_INDEX =
     "<!DOCTYPE html>"
     "<html><body>"
-    "<h1>wisleep</h1>"
+    "<h1><a href=\"/\">wisleep</a></h1>"
     "<link rel=\"icon\" href=\"favicon.ico\"/>"
     "<form action=\"spiflash\" method=\"get\">"
       "<fieldset>"
@@ -466,6 +468,7 @@ static const char *DEF_INDEX =
 static const char *NOTFOUND =
     "<!DOCTYPE html>"
     "<html><body>"
+    "<h1><a href=\"/\">wisleep</a></h1>"
     "<h1 align=\"center\">404 Not found</h1>"
     "</body></html>";
 
@@ -510,8 +513,9 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
 
     } else if (strstr(req->resource, "/uploadfile") == req->resource) {
         // --- uploading page
-      //make_partial_stream(&_stream_res, &part, part_ls, NULL);
-      return UWEB_return_redirect(req, "ls");
+      make_partial_stream(&_stream_res, &part, part_ls, NULL);
+      // DO NOT REDIRECT as this closes the stream => no file
+      //return UWEB_return_redirect(req, "ls");
 
     } else if (strstr(req->resource, "/dir") == req->resource) {
       return UWEB_return_redirect(req, "http://esp.pelleplutt.com/ls");
