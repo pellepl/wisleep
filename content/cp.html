@@ -17,10 +17,6 @@
     window.onload = function() {
       var $picker = document.getElementById("colorPicker");
       picker = tinycolorpicker($picker);
-
-	  $picker.addEventListener('click', function() {
-	    setcol();
-      });      
     }
     
   </script>
@@ -28,7 +24,7 @@
 <body>
   <h1><a href="/">wisleep</a></h1>
   <form action="setcol" method="post">
-  <div id="colorPicker">
+  <div id="colorPicker" onmouseup="setcol();">
     <a class="color"><div class="colorInner"></div></a>
     <div class="track"></div>
     <ul class="dropdown"><li></li></ul>
