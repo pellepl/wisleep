@@ -19,8 +19,18 @@ uweb_response server_actions(
   if (get_arg_str(req->resource, "col", arg) && strlen(arg) == 6) {
     uint32_t col = strtol(arg, NULL, 16);
     printf("set col %08x\n", col);
-    bridge_set_color(col);
+    bridge_lamp_set_color(col);
     return UWEB_OK;
+  }
+  else if (get_arg_str(req->resource, "askstat", arg)) {
+    lamp_status *stat = bridge_lamp_get_status();
+    char buf[64];
+    sprintf(buf, "%s,%i,#%06x",
+        stat->ena ? "1":"0",
+        stat->intensity,
+        stat->rgb);
+    make_char_stream_copy(res, buf);
+    return UWEB_CHUNKED;
   }
   make_char_stream(res, NOTFOUND);
   *http_status = S404_NOT_FOUND;

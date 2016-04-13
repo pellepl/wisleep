@@ -195,6 +195,24 @@ void LAMP_set_color(u32_t rgb) {
   lamp_update();
 }
 
+void LAMP_set_intensity(u8_t i) {
+  src_color = cur_color;
+  light = i;
+  light = MAX(light, 0x20);
+  light = MIN(light, 0xf0);
+  factor = 0;
+  lamp_update();
+}
+
+u32_t LAMP_get_color(void) {
+  return dst_color;
+}
+
+u8_t LAMP_get_intensity(void) {
+  return light;
+}
+
+
 void LAMP_cycle_delta(s16_t dcycle) {
   const u8_t colcount = sizeof(colors)/sizeof(colors[0]);
   cycle += dcycle;

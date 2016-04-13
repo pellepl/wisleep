@@ -55,6 +55,7 @@ char* get_arg_str(const char *req, const char *arg, char *dst);
 
 UW_STREAM make_null_stream(UW_STREAM str);
 UW_STREAM make_char_stream(UW_STREAM str, const char *txt);
+UW_STREAM make_char_stream_copy(UW_STREAM str, const char *txt);
 //UW_STREAM make_file_stream(UW_STREAM str, spiffs_file fd);
 UW_STREAM make_partial_stream(UW_STREAM str, part_def *part, generate_partial_content_f fn, void *user);
 UW_STREAM make_spif_stream(UW_STREAM str, uint32_t addr, uint32_t len);

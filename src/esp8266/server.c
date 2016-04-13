@@ -26,6 +26,7 @@ static uweb_data_stream _stream_tcp, _stream_res;
 static const char *_busy_title;
 static int _busy_progress;
 static volatile uint8_t _server_busy_claims;
+static part_def part;
 
 static int get_errno(int sock_fd) {
   int error;
@@ -198,6 +199,15 @@ UW_STREAM make_char_stream(UW_STREAM str, const char *txt) {
   str->user = (void *)txt;
   return str;
 }
+UW_STREAM make_char_stream_copy(UW_STREAM str, const char *txt) {
+  str->total_sz = strlen(txt);
+  str->avail_sz = str->total_sz;
+  memcpy(part.content, txt, str->total_sz); // reuse part structs content buffer for this
+  str->read = charstr_read;
+  str->write = 0;
+  str->user = (void *)part.content;
+  return str;
+}
 
 #define STREAM_CHUNK_SZ      256 /* this seems to be an optimal length */ //UWEB_TX_MAX_LEN
 
@@ -222,8 +232,6 @@ UW_STREAM make_spif_stream(UW_STREAM str, uint32_t addr, uint32_t len) {
   return str;
 }
 
-
-static part_def part;
 
 static void part_update(UW_STREAM str) {
   part_def *part = (part_def *)str->user;

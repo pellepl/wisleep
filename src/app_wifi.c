@@ -23,6 +23,7 @@ static u8_t dbg_ix = 0;
 static bool dbg_add = FALSE;
 static u8_t rx_buf[768];
 static u8_t tx_buf[768];
+static u8_t tx_ack_buf[768];
 static umac um;
 static task_timer umac_timer;
 static task *umac_timer_task;
@@ -93,9 +94,60 @@ static void rx_pkt(u32_t a, void *p) {
   umac_pkt *pkt = (umac_pkt *)p;
   print("pkt %02x\n", pkt->data[0]);
   switch (pkt->data[0])  {
+  case P_STM_LAMP_ENA: {
+    LAMP_enable(pkt->data[1] != 0);
+  }
+  break;
+  case P_STM_LAMP_INTENSITY: {
+    u32_t i = pkt->data[1];
+    LAMP_set_intensity(i);
+  }
+  break;
   case P_STM_LAMP_COLOR: {
     u32_t rgb = (pkt->data[1] << 16) | (pkt->data[2] << 8) | (pkt->data[3]);
     LAMP_set_color(rgb);
+  }
+  break;
+  case P_STM_LAMP_STATUS: {
+    LAMP_enable(pkt->data[1] != 0);
+    LAMP_set_intensity(pkt->data[2]);
+    LAMP_set_color((pkt->data[3] << 16) | (pkt->data[4] << 8) | (pkt->data[5]));
+  }
+  break;
+  case P_STM_LAMP_GET_ENA: {
+    u16_t ix = 0;
+    tx_ack_buf[ix++] = pkt->data[0];
+    tx_ack_buf[ix++] = LAMP_on();
+    umac_tx_reply_ack(&um, tx_ack_buf, ix);
+  }
+  break;
+  case P_STM_LAMP_GET_INTENSITY: {
+    u16_t ix = 0;
+    tx_ack_buf[ix++] = pkt->data[0];
+    tx_ack_buf[ix++] = LAMP_get_intensity();
+    umac_tx_reply_ack(&um, tx_ack_buf, ix);
+  }
+  break;
+  case P_STM_LAMP_GET_COLOR: {
+    u16_t ix = 0;
+    u32_t rgb = LAMP_get_color();
+    tx_ack_buf[ix++] = pkt->data[0];
+    tx_ack_buf[ix++] = rgb>>16;
+    tx_ack_buf[ix++] = rgb>>8;
+    tx_ack_buf[ix++] = rgb;
+    umac_tx_reply_ack(&um, tx_ack_buf, ix);
+  }
+  break;
+  case P_STM_LAMP_GET_STATUS: {
+    u16_t ix = 0;
+    u32_t rgb = LAMP_get_color();
+    tx_ack_buf[ix++] = pkt->data[0];
+    tx_ack_buf[ix++] = LAMP_on();
+    tx_ack_buf[ix++] = LAMP_get_intensity();
+    tx_ack_buf[ix++] = rgb>>16;
+    tx_ack_buf[ix++] = rgb>>8;
+    tx_ack_buf[ix++] = rgb;
+    umac_tx_reply_ack(&um, tx_ack_buf, ix);
   }
   break;
   default:
