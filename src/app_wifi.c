@@ -12,6 +12,9 @@
 #include "umac.h"
 #include "cli.h"
 
+#include "protocol.h"
+
+#include "lamp.h"
 
 static volatile bool um_uart_rd;
 
@@ -88,19 +91,15 @@ static void task_tick(u32_t a, void *p) {
 
 static void rx_pkt(u32_t a, void *p) {
   umac_pkt *pkt = (umac_pkt *)p;
-  u16_t ix = 0;
+  print("pkt %02x\n", pkt->data[0]);
   switch (pkt->data[0])  {
-  case 0x01:
-  while (ix < pkt->length) {
-    u8_t *d = &pkt->data[ix];
-    print("%02x:%02x:%02x:%02x:%02x:%02x ",
-        d[0], d[1], d[2], d[3], d[4], d[5]);
-    print("%02x %2i %+3i ", d[38], d[39], (s8_t)d[40]);
-    u32_t len = MAX(32, strlen((char *)&d[6]));
-    IO_put_buf(IODBG, &d[6], len);
-    print("\n");
-    ix += 6+32+3;
+  case P_STM_LAMP_COLOR: {
+    u32_t rgb = (pkt->data[1] << 16) | (pkt->data[2] << 8) | (pkt->data[3]);
+    LAMP_set_color(rgb);
   }
+  break;
+  default:
+    print("unhandled pkt %02x\n", pkt->data[0]);
   break;
   }
 }

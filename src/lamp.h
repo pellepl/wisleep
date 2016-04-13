@@ -11,6 +11,7 @@
 void LAMP_init(void);
 void LAMP_enable(bool ena);
 bool LAMP_on(void);
+void LAMP_set_color(u32_t rgb);
 void LAMP_cycle_delta(s16_t dcycle);
 void LAMP_light_delta(s8_t dlight);
 

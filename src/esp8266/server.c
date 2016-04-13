@@ -12,26 +12,14 @@
 #include "../uweb/src/uweb.h"
 #include "../uweb/src/uweb_http.h"
 #include "octet_spiflash.h"
-#include "fs.h"
 #include "systasks.h"
+#include "fs.h"
 
 //#define RAW_SERV // TODO
 //#define NETCONN_SERV
 #define SOCK_SERV
 
-struct part_def_s;
-
-typedef uint32_t (* generate_partial_content_f)(struct part_def_s *part, uint32_t max_len, uint32_t part_nbr, uint8_t *dst);
-
-typedef struct part_def_s {
-  uint8_t content[256];
-  generate_partial_content_f gen_fn;
-  uint32_t nbr;
-  uint32_t len;
-  uint32_t ix;
-  void *user;
-} part_def;
-
+static action_fn _act_fn = NULL;
 static uint32_t _upload_sz;
 static spiffs_file _upload_fd = 0;
 static uweb_data_stream _stream_tcp, _stream_res;
@@ -46,7 +34,7 @@ static int get_errno(int sock_fd) {
   return error;
 }
 
-static bool strendnocase(const char *str, const char *pfx) {
+bool strendnocase(const char *str, const char *pfx) {
   int str_len = strlen(str);
   int pfx_len = strlen(pfx);
   if (str_len < pfx_len) return false;
@@ -59,6 +47,44 @@ static bool strendnocase(const char *str, const char *pfx) {
     if (str_c != pfx_c) return false;
   }
   return true;
+}
+
+char* get_arg_str(const char *req, const char *arg, char *dst) {
+  char arg_str[32];
+  memset(arg_str, 0, sizeof(arg_str));
+  strcpy(arg_str, arg);
+  int arg_len = strlen(arg);
+  arg_str[arg_len] = '=';
+  char *arg_data;
+  if ((arg_data = strstr(req, arg_str))) {
+    arg_data += arg_len + 1;
+    const char *arg_data_end;
+    if ((arg_data_end = strchr(arg_data, '&')) == NULL) {
+      arg_data_end = &req[strlen(req)];
+    }
+    if (dst) {
+      urlndecode(dst, arg_data, arg_data_end - arg_data);
+    } else {
+      dst = arg_data;
+    }
+  } else {
+    dst = NULL;
+  }
+  return dst;
+}
+
+static bool get_arg_int(const char *req, const char *arg, int32_t *dst, int32_t def) {
+  char arg_data[14];
+  if (get_arg_str(req, arg, arg_data)) {
+    if (dst) {
+      *dst = strtol(arg_data, NULL, 0);
+    }
+    return true;
+  }
+  if (dst) {
+    *dst = def;
+  }
+  return false;
 }
 
 #ifdef SOCK_SERV
@@ -84,7 +110,7 @@ static int32_t sockstr_write(UW_STREAM str, uint8_t *src, uint32_t len) {
 static void sockstr_close(UW_STREAM str) {
   close((intptr_t)str->user);
 }
-static UW_STREAM make_tcp_stream(UW_STREAM str, int sockfd) {
+UW_STREAM make_tcp_stream(UW_STREAM str, int sockfd) {
   str->total_sz = -1;
   str->avail_sz = 256;
   str->user = (void *)((intptr_t)sockfd);
@@ -147,7 +173,7 @@ static UW_STREAM make_tcp_stream(UW_STREAM str, struct netconn *nc) {
 }
 #endif // NETCONN_SERV
 
-static UW_STREAM make_null_stream(UW_STREAM str) {
+UW_STREAM make_null_stream(UW_STREAM str) {
   str->total_sz = 0;
   str->avail_sz = 0;
   str->read = 0;
@@ -164,7 +190,7 @@ static int32_t charstr_read(UW_STREAM str, uint8_t *dst, uint32_t len) {
   str->user += len;
   return len;
 }
-static UW_STREAM make_char_stream(UW_STREAM str, const char *txt) {
+UW_STREAM make_char_stream(UW_STREAM str, const char *txt) {
   str->total_sz = strlen(txt);
   str->avail_sz = str->total_sz;
   str->read = charstr_read;
@@ -187,7 +213,7 @@ static int32_t spifstr_read(UW_STREAM str, uint8_t *dst, uint32_t len) {
   str->user = (void *)(intptr_t)(addr + len);
   return len;
 }
-static UW_STREAM make_spif_stream(UW_STREAM str, uint32_t addr, uint32_t len) {
+UW_STREAM make_spif_stream(UW_STREAM str, uint32_t addr, uint32_t len) {
   str->total_sz = len;
   str->avail_sz = len < STREAM_CHUNK_SZ ? len : STREAM_CHUNK_SZ;
   str->read = spifstr_read;
@@ -223,7 +249,7 @@ static int32_t partstr_read(UW_STREAM str, uint8_t *dst, uint32_t len) {
     return 0;
   }
 }
-static UW_STREAM make_partial_stream(UW_STREAM str, part_def *part, generate_partial_content_f fn, void *user) {
+UW_STREAM make_partial_stream(UW_STREAM str, part_def *part, generate_partial_content_f fn, void *user) {
   str->user = part;
   part->nbr = 0;
   part->user = user;
@@ -234,7 +260,7 @@ static UW_STREAM make_partial_stream(UW_STREAM str, part_def *part, generate_par
   str->write = NULL;
   return str;
 }
-static void close_partial_stream(part_def *part) {
+void close_partial_stream(part_def *part) {
   part->gen_fn = NULL;
 }
 
@@ -258,7 +284,7 @@ static int32_t filestr_read(UW_STREAM str, uint8_t *dst, uint32_t len) {
   }
   return len;
 }
-static UW_STREAM make_file_stream(UW_STREAM str, spiffs_file fd) {
+UW_STREAM make_file_stream(UW_STREAM str, spiffs_file fd) {
   spiffs_stat stat;
   int32_t res = fs_fstat(fd, &stat);
   uint32_t len = 0;
@@ -280,6 +306,37 @@ static UW_STREAM make_file_stream(UW_STREAM str, spiffs_file fd) {
 static uint32_t part_busy(part_def *part, uint32_t max_len, uint32_t part_nbr, uint8_t *dst) {
   uint32_t len = 0;
   if (part->nbr == 0) {
+    sprintf((char *)dst,
+        "<!DOCTYPE html>"
+        "<html>"
+        "<style>progress[value]{width:75%%;}</style>"
+        "<script>"
+          "var polling=false;"
+          "function tick() {"
+            "if (!polling) {"
+              "polling=true;"
+              "var xh = new XMLHttpRequest();"
+              "xh.open(\"GET\", \"/__busy\", true);"
+              "xh.send(null);"
+    );
+    len = strlen((char *)dst);
+  } else if (part->nbr == 1) {
+    sprintf((char *)dst,
+              "xh.onreadystatechange = function() {"
+                "polling=false;"
+                "if (xh.readyState==4 && xh.status==200) {"
+                  "var s=xh.responseText;"
+                  "if (s==\"!BUSY\") {"
+                    "location.reload(true);"
+                  "} else if (s!=\"INDEF\") {"
+                    "document.getElementById(\"bprog\").value=Number(s);"
+                  "}"
+                "}"
+            "};"
+          "}"
+        );
+    len = strlen((char *)dst);
+  } else if (part->nbr == 2) {
     char sprogress[32];
     if (_busy_progress >= 0) {
       sprintf(sprogress, "value=\"%i\"", _busy_progress);
@@ -287,12 +344,12 @@ static uint32_t part_busy(part_def *part, uint32_t max_len, uint32_t part_nbr, u
       memset(sprogress, 0, sizeof(sprogress));
     }
     sprintf((char *)dst,
-        "<!DOCTYPE html>"
-        "<html>"
-        "<style>progress[value]{width:75%%;}</style>"
-        "<body onload=\"setTimeout('location.reload(true);',500);\">"
+          "setTimeout('tick();',500);"
+        "}"
+        "</script>"
+        "<body onload=\"tick();\">"
         "<h2 align=\"center\">%s</h2>"
-        "<div align=\"middle\"><progress %s max=\"100\"></progress></div>"
+        "<div align=\"middle\"><progress id=\"bprog\" %s max=\"100\"></progress></div>"
         "</body></html>",
         _busy_title, sprogress);
     len = strlen((char *)dst);
@@ -308,10 +365,20 @@ static uint32_t part_ls(part_def *part, uint32_t max_len, uint32_t part_nbr, uin
   if (part->nbr == 0) {
     const char *LS_PRE =
         "<!DOCTYPE html>"
-        "<html><body>"
+        "<html>"
+        "<script>"
+          "function mv(fnm) {"
+           "var nnm = prompt(\"New name\", fnm);"
+           "if (nnm && nnm!='null') {"
+             "window.location.href='mv?old='+fnm+'&new='+nnm;"
+           "}"
+           "return false;"
+          "}"
+        "</script>"
+        "<body>"
         "<h1><a href=\"/\">wisleep</a></h1>"
         "<div align=\"middle\"><table style=\"border:1px solid;font-family:courier;border-spacing:8px;\">"
-        "<tr><td><b>NAME</b></td><td><b>SIZE</b></td><td><b>OBJID</b></td><td><b>RM</b></td></tr>";
+        "<tr><td><b>NAME</b></td><td><b>SIZE</b></td><td><b>OBJID</b></td><td><b>RM</b></td><td><b>MV</b></td></tr>";
     part->user = (void *)fs_opendir("/", &_ls_d);
     len = strlen(LS_PRE);
     memcpy(dst, LS_PRE, len);
@@ -351,16 +418,17 @@ static uint32_t part_ls(part_def *part, uint32_t max_len, uint32_t part_nbr, uin
           "%s</a></td>"
           "<td>%i</td>"
           "<td>%04x</td>"
-          "<td><a href=\"/rm?name=%s\">X</a></td>"
+          "<td><a href='/rm?name=%s'>X</a></td>"
+          "<td><a href='/mv?%s' onclick='return mv(\"%s\");'>N</a></td>"
           "</tr>",
-          e.name, e.name, e.size, e.obj_id, e.name);
+          e.name, e.name, e.size, e.obj_id, e.name, e.name, e.name);
       len = strlen((char *)dst);
     } else {
       uint32_t total, used;
       fs_info(&total, &used);
       sprintf((char *)dst,
-        "<tr><td colspan=\"4\">&nbsp;</td></tr>"
-        "<tr><td>USED</td><td>%i</td><td>TOTAL</td><td>%i</td></tr>"
+        "<tr><td colspan=\"5\">&nbsp;</td></tr>"
+        "<tr><td>USED</td><td>%i</td><td>TOTAL</td><td colspan=\"2\">%i</td></tr>"
         "</table></div>",
       used, total);
       len = strlen((char *)dst);
@@ -465,7 +533,7 @@ static const char *DEF_INDEX =
     "</tr></table></div>"
     "</body></html>"
         ;
-static const char *NOTFOUND =
+const char *NOTFOUND =
     "<!DOCTYPE html>"
     "<html><body>"
     "<h1><a href=\"/\">wisleep</a></h1>"
@@ -478,6 +546,7 @@ static const char *NOTFOUND =
 static char extra_hdrs[128];
 
 static part_def part;
+static char __prog_txt[16];
 
 static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
     uweb_http_status *http_status, char *content_type,
@@ -486,8 +555,17 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
   // if server is busy, load busy page
   if (server_is_busy()) {
     if (req->chunk_nbr == 0) {
-      printf("req BUSY %s\n", &req->resource[1]);
-      make_partial_stream(&_stream_res, &part, part_busy, NULL);
+      if (strcmp(req->resource, "/__busy") == 0) {
+        if (_busy_progress >= 0) {
+          sprintf(__prog_txt, "%i", _busy_progress);
+        } else {
+          sprintf(__prog_txt, "INDEF");
+        }
+        make_char_stream(&_stream_res, __prog_txt);
+      } else {
+        printf("req BUSY %s\n", &req->resource[1]);
+        make_partial_stream(&_stream_res, &part, part_busy, NULL);
+      }
     }
 
     *res = &_stream_res;
@@ -501,7 +579,10 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
     make_null_stream(&_stream_res);
     WDT.FEED = WDT_FEED_MAGIC;
 
-    if (strcmp(req->resource, "/index.html") == 0 || strlen(req->resource) == 1) {
+    if (strcmp(req->resource, "/__busy") == 0) {
+      sprintf(__prog_txt, "!BUSY");
+      make_char_stream(&_stream_res, __prog_txt);
+    } else if (strcmp(req->resource, "/index.html") == 0 || strlen(req->resource) == 1) {
       // --- index.html
       spiffs_file fd = fs_open("index.html", SPIFFS_RDONLY, 0);
       if (fd < 0) {
@@ -545,6 +626,18 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
       //make_partial_stream(&_stream_res, &part, part_ls, NULL);
       return UWEB_return_redirect(req, "ls");
 
+    } else if (strstr(req->resource, "/mv?") == req->resource) {
+        // --- rename file and file list page
+      char old_name[SPIFFS_OBJ_NAME_LEN];
+      char new_name[SPIFFS_OBJ_NAME_LEN];
+      do {
+        if (get_arg_str(req->resource, "old", old_name) == NULL) break;
+        if (get_arg_str(req->resource, "new", new_name) == NULL) break;
+        if (old_name[0] == '.' || new_name[0] == '.') break;
+        fs_rename(old_name, new_name);
+      } while (0);
+      return UWEB_return_redirect(req, "ls");
+
     } else if (strstr(req->resource, "/format") == req->resource) {
         // --- format and file list page
       systask_call(SYS_FS_FORMAT, true);
@@ -558,8 +651,10 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
     } else if (strstr(req->resource, "/spiflash") == req->resource) {
       // --- read spiflash
       sprintf(content_type, "application/octet-stream");
-      uint32_t addr = 0;
-      uint32_t len = sdk_flashchip.chip_size;
+      uint32_t addr, len;
+      get_arg_int(req->resource, "addr", (int32_t*)&addr, 0);
+      get_arg_int(req->resource, "len", (int32_t*)&len, sdk_flashchip.chip_size);
+
       char *addr_ix, *len_ix;
       if ((addr_ix = strstr(req->resource, "addr="))) {
         addr = strtol(addr_ix+5, NULL, 0);
@@ -589,47 +684,58 @@ static uweb_response uweb_resp(uweb_request_header *req, UW_STREAM *res,
       } else {
         strncpy(fname, resource_str, SPIFFS_OBJ_NAME_LEN);
       }
-      spiffs_file fd = fs_open(fname, SPIFFS_RDONLY, 0);
-      if (fd < 0) {
-        printf("fs file %s not found (err %i)\n", fname, fs_errno());
-        make_char_stream(&_stream_res, NOTFOUND);
-        *http_status = S404_NOT_FOUND;
+
+      if (strendnocase(fname, "/act")) {
+        // action
+        if (_act_fn) {
+          uweb_response act_res = _act_fn(req, &_stream_res, http_status,
+              content_type, extra_headers);
+          *res = &_stream_res;
+          return act_res;
+        }
       } else {
-        printf("opening fs file %s (fd=%i)\n", fname, fd);
-        if (strendnocase(fname, ".jpg") || strendnocase(fname, ".jpeg")) {
-          sprintf(content_type, "image/jpeg");
+        spiffs_file fd = fs_open(fname, SPIFFS_RDONLY, 0);
+        if (fd < 0) {
+          printf("fs file %s not found (err %i)\n", fname, fs_errno());
+          make_char_stream(&_stream_res, NOTFOUND);
+          *http_status = S404_NOT_FOUND;
+        } else {
+          printf("opening fs file %s (fd=%i)\n", fname, fd);
+          if (strendnocase(fname, ".jpg") || strendnocase(fname, ".jpeg")) {
+            sprintf(content_type, "image/jpeg");
+          }
+          else if (strendnocase(fname, ".gif")) {
+            sprintf(content_type, "image/gif");
+          }
+          else if (strendnocase(fname, ".png")) {
+            sprintf(content_type, "image/png");
+          }
+          else if (strendnocase(fname, ".bmp")) {
+            sprintf(content_type, "image/bmp");
+          }
+          else if (strendnocase(fname, ".tiff")) {
+            sprintf(content_type, "image/tiff");
+          }
+          else if (strendnocase(fname, ".webp")) {
+            sprintf(content_type, "image/webp");
+          }
+          else if (strendnocase(fname, ".ico")) {
+            sprintf(content_type, "image/x-icon");
+          }
+          else if (strendnocase(fname, ".css")) {
+            sprintf(content_type, "text/css");
+          }
+          else if (strendnocase(fname, ".pdf")) {
+            sprintf(content_type, "application/pdf");
+          }
+          else if (strendnocase(fname, ".wav")) {
+            sprintf(content_type, "audio/x-wav");
+          }
+          else if (strendnocase(fname, ".js")) {
+            sprintf(content_type, "application/javascript");
+          }
+          make_file_stream(&_stream_res, fd);
         }
-        else if (strendnocase(fname, ".gif")) {
-          sprintf(content_type, "image/gif");
-        }
-        else if (strendnocase(fname, ".png")) {
-          sprintf(content_type, "image/png");
-        }
-        else if (strendnocase(fname, ".bmp")) {
-          sprintf(content_type, "image/bmp");
-        }
-        else if (strendnocase(fname, ".tiff")) {
-          sprintf(content_type, "image/tiff");
-        }
-        else if (strendnocase(fname, ".webp")) {
-          sprintf(content_type, "image/webp");
-        }
-        else if (strendnocase(fname, ".ico")) {
-          sprintf(content_type, "image/x-icon");
-        }
-        else if (strendnocase(fname, ".css")) {
-          sprintf(content_type, "text/css");
-        }
-        else if (strendnocase(fname, ".pdf")) {
-          sprintf(content_type, "application/pdf");
-        }
-        else if (strendnocase(fname, ".wav")) {
-          sprintf(content_type, "audio/x-wav");
-        }
-        else if (strendnocase(fname, ".js")) {
-          sprintf(content_type, "application/javascript");
-        }
-        make_file_stream(&_stream_res, fd);
       }
     }
 
@@ -682,6 +788,10 @@ static void uweb_data(uweb_request_header *req, uweb_data_type type,
     }
   }
 
+}
+
+void server_init(action_fn act_fn) {
+  _act_fn = act_fn;
 }
 
 bool server_is_busy(void) {

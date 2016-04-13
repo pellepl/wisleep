@@ -188,6 +188,13 @@ bool LAMP_on(void) {
   return lamp_enabled && !lamp_disabling;
 }
 
+void LAMP_set_color(u32_t rgb) {
+  src_color = cur_color;
+  dst_color = rgb;
+  factor = 0;
+  lamp_update();
+}
+
 void LAMP_cycle_delta(s16_t dcycle) {
   const u8_t colcount = sizeof(colors)/sizeof(colors[0]);
   cycle += dcycle;

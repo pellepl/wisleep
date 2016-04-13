@@ -7,9 +7,11 @@ PROGRAM_SRC_DIR=./../..
 PROGRAM_SRC_FILES = \
 	esp_wisleep.c \
 	server.c \
+	server_actions.c \
 	fs.c \
 	octet_spiflash.c \
 	systasks.c \
+	bridge.c \
 	../umac/umac.c \
 	../uweb/src/uweb.c \
 	../uweb/src/uweb_codec.c \
