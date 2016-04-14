@@ -391,7 +391,7 @@ int umac_tx_pkt(umac *u, uint8_t ack, uint8_t *buf, uint16_t len) {
   pkt->length = len;
   pkt->seqno = ack ? u->tx_seqno : 0;
   _umac_tx_initial(u, pkt);
-  return 0;
+  return pkt->seqno;
 }
 
 int umac_tx_reply_ack(umac *u, uint8_t *buf, uint16_t len) {

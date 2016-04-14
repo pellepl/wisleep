@@ -267,6 +267,8 @@ void APP_init(void) {
 
   WB_init();
 
+  APP_claim(99); // TODO keep alive
+
   app_spin();
 }
 

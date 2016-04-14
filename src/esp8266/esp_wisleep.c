@@ -107,6 +107,7 @@ void user_init(void) {
 
   printf("\n\nESP8266 UMAC\n\n");
 
+  bridge_init();
   umac_cfg um_cfg = {
       .timer_fn = umac_impl_request_future_tick,
       .cancel_timer_fn = umac_impl_cancel_future_tick,

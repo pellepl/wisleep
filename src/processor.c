@@ -287,6 +287,8 @@ void PROC_base_init() {
 void PROC_periph_init() {
   DBGMCU_Config(STM32_SYSTEM_TIMER_DBGMCU, ENABLE);
 
+  DBGMCU_Config(DBGMCU_STOP | DBGMCU_SLEEP, ENABLE);
+
   // led
   gpio_config(PORTC, PIN13, CLK_50MHZ, OUT, AF0, PUSHPULL, NOPULL);
 

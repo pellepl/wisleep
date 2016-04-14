@@ -16,13 +16,12 @@ static xQueueHandle sysq;
 static struct sdk_scan_config scan_cfg;
 static void sdk_scan_done_cb(void *arg, sdk_scan_status_t status) {
   if (status == SCAN_OK) {
-    spiffs_file fd = fs_open(SYSTASK_AP_SCAN_FILENAME, SPIFFS_O_CREAT | SPIFFS_O_TRUNC | SPIFFS_O_APPEND | SPIFFS_O_RDWR, 0);
+    spiffs_file fd = fs_open(SYSTASK_AP_SCAN_FILENAME,
+        SPIFFS_O_CREAT | SPIFFS_O_TRUNC | SPIFFS_O_APPEND | SPIFFS_O_RDWR, 0);
     struct sdk_bss_info *bss_link = (struct sdk_bss_info *) arg;
     bss_link = (struct sdk_bss_info *) bss_link->next.stqe_next; //ignore first
     while (fd >= 0 && bss_link != NULL) {
       fs_write(fd, bss_link, sizeof(struct sdk_bss_info));
-      printf("ssid:%s  ch%i  rssi:%i\n", bss_link->ssid, bss_link->channel,
-          bss_link->rssi);
       bss_link = (struct sdk_bss_info *) bss_link->next.stqe_next;
     }
     fs_close(fd);

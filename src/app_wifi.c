@@ -147,6 +147,7 @@ static void rx_pkt(u32_t a, void *p) {
     tx_ack_buf[ix++] = rgb>>16;
     tx_ack_buf[ix++] = rgb>>8;
     tx_ack_buf[ix++] = rgb;
+    print("tx lamp ena:%i int:%i rgb:%02x%02x%02x\n", tx_ack_buf[1], tx_ack_buf[2], tx_ack_buf[3], tx_ack_buf[4], tx_ack_buf[5]);
     umac_tx_reply_ack(&um, tx_ack_buf, ix);
   }
   break;

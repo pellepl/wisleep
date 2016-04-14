@@ -8,17 +8,29 @@
   <script type="text/javascript">
     var picker;
     
-    function setcol() {
-      var xmlHttp = new XMLHttpRequest();
-      xmlHttp.open("GET", window.location.pathname + '/act?col=' + picker.colorHex.substring(1), true); 
-      xmlHttp.send(null);
+    function getstat() {
+      var xh = new XMLHttpRequest();
+      xh.open("GET", window.location.pathname + '/act?askstat=1', true); 
+      xh.send(null);
+      xh.onreadystatechange = function() {
+        if (xh.readyState==4 && xh.status==200) {
+          var s=xh.responseText.split(',');
+          picker.setColor(s[2]);
+        }
+      }
     }
     
     window.onload = function() {
       var $picker = document.getElementById("colorPicker");
       picker = tinycolorpicker($picker);
+      getstat();
     }
     
+    function setcol() {
+      var xh = new XMLHttpRequest();
+      xh.open("GET", window.location.pathname + '/act?col=' + picker.colorHex.substring(1), true); 
+      xh.send(null);
+    }
   </script>
 </head>
 <body>

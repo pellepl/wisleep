@@ -23,7 +23,7 @@ uweb_response server_actions(
     return UWEB_OK;
   }
   else if (get_arg_str(req->resource, "askstat", arg)) {
-    lamp_status *stat = bridge_lamp_get_status();
+    lamp_status *stat = bridge_lamp_get_status(true);
     char buf[64];
     sprintf(buf, "%s,%i,#%06x",
         stat->ena ? "1":"0",
