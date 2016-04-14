@@ -83,7 +83,8 @@ lamp_status *bridge_lamp_get_status(bool refresh_syncronously) {
 /////////////////////////////////////////////////////
 
 void bridge_pkt_acked(uint8_t seqno, uint8_t *data, uint16_t len) {
-  printf("ack pkt %i\n", seqno);
+  printf("ack pkt %i, cmd %02x, len %i\n", seqno, data[0], len);
+  if (len == 0) return;
   switch (data[0]) {
   case P_STM_LAMP_GET_ENA:
     lamp.ena = data[1] != 0;
