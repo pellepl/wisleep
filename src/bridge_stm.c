@@ -28,8 +28,6 @@ static umac um;
 static task_timer umac_timer;
 static task *umac_timer_task;
 
-static void rx_pkt(u32_t a, void *p);
-
 static void um_impl_request_future_tick(umtick delta) {
   TASK_start_timer(umac_timer_task, &umac_timer, 0, NULL, delta, 0, "umtim");
 }
@@ -48,11 +46,6 @@ static void um_impl_tx_byte(u8_t c) {
 
 static void um_impl_tx_buf(u8_t *b, u16_t len) {
   IO_put_buf(IOWIFI, b, len);
-}
-
-static void um_impl_rx_pkt(umac_pkt *pkt) {
-  task *rx_task = TASK_create(rx_pkt, 0);
-  TASK_run(rx_task, 0, pkt);
 }
 
 static void um_impl_tx_pkt_acked(u8_t seqno, u8_t *data, u16_t len) {
@@ -90,8 +83,7 @@ static void task_tick(u32_t a, void *p) {
   umac_tick(&um);
 }
 
-static void rx_pkt(u32_t a, void *p) {
-  umac_pkt *pkt = (umac_pkt *)p;
+static void um_impl_rx_pkt(umac_pkt *pkt) {
   print("pkt %02x\n", pkt->data[0]);
   switch (pkt->data[0])  {
   case P_STM_LAMP_ENA: {
