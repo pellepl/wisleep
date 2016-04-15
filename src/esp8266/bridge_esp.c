@@ -5,7 +5,8 @@
  *      Author: petera
  */
 
-#include "bridge.h"
+#include "bridge_esp.h"
+
 #include <stdint.h>
 #include <sys/types.h>
 #include <stdlib.h>

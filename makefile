@@ -112,7 +112,7 @@ CFILES 		+= processor.c
 CFILES 		+= timer.c
 
 CFILES		+= app.c sensor.c lamp.c
-CFILES		+= ws2812b_spi_stm32f1.c app_wifi.c
+CFILES		+= ws2812b_spi_stm32f1.c bridge_stm.c
 
 umacdir		= ${sourcedir}/umac
 CPATH		+= ${umacdir}

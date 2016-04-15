@@ -8,9 +8,9 @@
 #include "server.h"
 #include "../uweb/src/uweb.h"
 #include "../uweb/src/uweb_http.h"
+#include "bridge_esp.h"
 #include "fs.h"
 #include "systasks.h"
-#include "bridge.h"
 
 uweb_response server_actions(
     uweb_request_header *req, UW_STREAM res, uweb_http_status *http_status,

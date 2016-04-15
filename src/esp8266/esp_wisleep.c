@@ -20,9 +20,9 @@
 #include "fs.h"
 
 #include "../umac/umac.h"
+#include "bridge_esp.h"
 #include "systasks.h"
 
-#include "bridge.h"
 
 static umac um;
 static unsigned char rx_buf[768];
