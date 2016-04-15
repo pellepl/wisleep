@@ -8,7 +8,7 @@
 #ifndef SRC_PROTOCOL_H_
 #define SRC_PROTOCOL_H_
 
-// packet ids to stm from efm
+// packet ids to stm from esp
 typedef enum {
   P_STM_HELLO = 0,
   P_STM_LAMP_ENA,           // [on/off]
@@ -23,10 +23,10 @@ typedef enum {
 
 } proto_stm;
 
-// packet ids to efm from stm
+// packet ids to esp from stm
 typedef enum {
-  P_EFM_HELLO = 0,
-  P_EFM_REQUEST_TIME,       //
+  P_ESP_HELLO = 0,
+  P_ESP_REQUEST_TIME,       //
 
 
 } proto_efm;
