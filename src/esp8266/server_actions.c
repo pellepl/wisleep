@@ -22,6 +22,12 @@ uweb_response server_actions(
     bridge_lamp_set_color(col);
     return UWEB_OK;
   }
+  else if (get_arg_str(req->resource, "inten", arg)) {
+    uint32_t intensity = strtol(arg, NULL, 10);
+    printf("set intensity %08x\n", intensity);
+    bridge_lamp_set_intensity(intensity);
+    return UWEB_OK;
+  }
   else if (get_arg_str(req->resource, "askstat", arg)) {
     lamp_status *stat = bridge_lamp_get_status(true);
     char buf[64];

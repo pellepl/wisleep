@@ -15,6 +15,7 @@
       xh.onreadystatechange = function() {
         if (xh.readyState==4 && xh.status==200) {
           var s=xh.responseText.split(',');
+          document.getElementById('inten').value = s[1];
           picker.setColor(s[2]);
         }
       }
@@ -31,10 +32,23 @@
       xh.open("GET", window.location.pathname + '/act?col=' + picker.colorHex.substring(1), true); 
       xh.send(null);
     }
+    function setinten(inten) {
+      var xh = new XMLHttpRequest();
+      xh.open("GET", window.location.pathname + '/act?inten=' +inten, true); 
+      xh.send(null);
+    }
   </script>
+<style>
+input[type=range] {
+ -webkit-appearance: none;
+ width: 300px;
+ background: linear-gradient(to right, #202020 , #f0f0f0);
+}
+</style>
 </head>
 <body>
   <h1><a href="/">wisleep</a></h1>
+  <fieldset><legend>Color</legend>
   <form action="setcol" method="post">
   <div id="colorPicker" onmouseup="setcol();">
     <a class="color"><div class="colorInner"></div></a>
@@ -46,5 +60,12 @@
   <div align="middle">
   <button onclick="setcol()">Set Color</button>
   </div>
+  </fieldset>
+  <fieldset><legend>Intensity</legend>
+  <div align="middle">
+    <input id="inten" type="range" min="20" max="250" onchange="setinten(document.getElementById('inten').value);"/>
+  </div>
+  </form></fieldset>
 </body>
 </html>
+
