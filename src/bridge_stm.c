@@ -92,7 +92,12 @@ static void um_impl_rx_pkt(umac_pkt *pkt) {
   break;
   case P_STM_LAMP_INTENSITY: {
     u32_t i = pkt->data[1];
-    LAMP_set_intensity(i);
+    if (i < LAMP_MIN_INTENSITY) {
+      LAMP_enable(FALSE);
+    } else {
+      LAMP_set_intensity(i);
+      LAMP_enable(TRUE);
+    }
   }
   break;
   case P_STM_LAMP_COLOR: {

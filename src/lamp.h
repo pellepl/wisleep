@@ -8,6 +8,9 @@
 #ifndef _LAMP_H_
 #define _LAMP_H_
 
+#define LAMP_MIN_INTENSITY 0x20
+#define LAMP_MAX_INTENSITY 0xf0
+
 void LAMP_init(void);
 void LAMP_enable(bool ena);
 bool LAMP_on(void);

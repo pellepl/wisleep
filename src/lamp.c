@@ -198,14 +198,14 @@ void LAMP_set_color(u32_t rgb) {
 void LAMP_set_intensity(u8_t i) {
   src_color = cur_color;
   light = i;
-  light = MAX(light, 0x20);
-  light = MIN(light, 0xf0);
+  light = MAX(light, LAMP_MIN_INTENSITY);
+  light = MIN(light, LAMP_MAX_INTENSITY);
   factor = 0;
   lamp_update();
 }
 
 u32_t LAMP_get_color(void) {
-  return dst_color;
+  return (lamp_disabling || !lamp_enabled) ? lst_color : dst_color;
 }
 
 u8_t LAMP_get_intensity(void) {
