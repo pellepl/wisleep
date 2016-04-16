@@ -857,7 +857,7 @@ void server_task(void *pvParameters) {
 #ifdef SOCK_SERV
 void server_task(void *pvParameters) {
   int sock_fd, client_fd;
-  struct sockaddr_in sa, isa;
+  struct sockaddr_in local, remote;
 
   UWEB_init(uweb_resp, uweb_data);
 
@@ -868,22 +868,22 @@ void server_task(void *pvParameters) {
       printf("socket failed\n");
       return;
     }
-    memset(&sa, 0, sizeof(struct sockaddr_in));
-    sa.sin_family = AF_INET;
-    sa.sin_addr.s_addr = INADDR_ANY;
-    sa.sin_port = htons(80);
+    memset(&local, 0, sizeof(struct sockaddr_in));
+    local.sin_family = AF_INET;
+    local.sin_addr.s_addr = INADDR_ANY;
+    local.sin_port = htons(80);
 
-    if (lwip_bind(sock_fd, (struct sockaddr *)&sa, sizeof(sa) < 0)) {
+    if (lwip_bind(sock_fd, (struct sockaddr *)&local, sizeof(local) < 0)) {
       printf("bind failed\n");
       lwip_close(sock_fd);
       return;
     }
 
     lwip_listen(sock_fd, 3);
-    socklen_t addr_size = sizeof(sa);
+    socklen_t addr_size = sizeof(local);
     printf("listening to port 80\n");
     while (true) {
-      client_fd = lwip_accept(sock_fd, (struct sockaddr *)&isa, &addr_size);
+      client_fd = lwip_accept(sock_fd, (struct sockaddr *)&remote, &addr_size);
       if (client_fd < 0) {
         printf("accept failed err %i\n", get_errno(sock_fd));
         lwip_close(sock_fd);

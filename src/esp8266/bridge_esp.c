@@ -21,8 +21,8 @@
 #include "../protocol.h"
 
 static xQueueHandle syncq;
-static volatile uint32_t sync_seqno;
-static volatile lamp_status lamp;
+static uint32_t sync_seqno;
+static lamp_status lamp;
 
 void bridge_lamp_set_color(uint32_t rgb) {
   uint8_t pkt[] = {

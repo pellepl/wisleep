@@ -8,6 +8,7 @@
 #include "systasks.h"
 #include "fs.h"
 #include "server.h"
+#include "ntp.h"
 
 #define SYSTASK_CLAIM_FLAG (1<<31)
 
@@ -58,6 +59,10 @@ static void systask_task(void *pvParameters) {
           server_release_busy();
         }
         break;
+      case SYS_NTP_QUERY: {
+        ntp_query();
+      }
+      break;
       case SYS_TEST: {
         uint32_t progress;
         server_claim_busy();

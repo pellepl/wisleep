@@ -11,6 +11,7 @@
 #include "bridge_esp.h"
 #include "fs.h"
 #include "systasks.h"
+#include "ntp.h"
 
 uweb_response server_actions(
     uweb_request_header *req, UW_STREAM res, uweb_http_status *http_status,
@@ -35,6 +36,14 @@ uweb_response server_actions(
         stat->ena ? "1":"0",
         stat->intensity,
         stat->rgb);
+    make_char_stream_copy(res, buf);
+    return UWEB_CHUNKED;
+  }
+  else if (get_arg_str(req->resource, "qntp", arg)) {
+    ntp_set_host(arg);
+    systask_call(SYS_NTP_QUERY, true);
+    char buf[64];
+    sprintf(buf, arg);
     make_char_stream_copy(res, buf);
     return UWEB_CHUNKED;
   }

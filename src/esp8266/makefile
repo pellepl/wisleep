@@ -12,6 +12,7 @@ PROGRAM_SRC_FILES = \
 	octet_spiflash.c \
 	systasks.c \
 	bridge_esp.c \
+	ntp.c \
 	../umac/umac.c \
 	../uweb/src/uweb.c \
 	../uweb/src/uweb_codec.c \
