@@ -135,8 +135,8 @@ void ntp_query(void) {
   uint64_t receive_time = read_timestamp(ntprsp, RECEIVE_TIME_OFFSET);
   uint64_t transmit_time = read_timestamp(ntprsp, TRANSMIT_TIME_OFFSET);
 
-  printf("originate:%i\n", (uint32_t)(originate_time >> 32));
-  printf("receive:  %i\n", (uint32_t)(receive_time >> 32));
-  printf("transmit: %i\n", (uint32_t)(transmit_time >> 32));
+  printf("originate:%i\n", (uint32_t)(read32(ntprsp, ORIGINATE_TIME_OFFSET) - OFFSET_1900_TO_1970));
+  printf("receive:  %i\n", (uint32_t)(read32(ntprsp, RECEIVE_TIME_OFFSET) - OFFSET_1900_TO_1970));
+  printf("transmit: %i\n", (uint32_t)(read32(ntprsp, TRANSMIT_TIME_OFFSET) - OFFSET_1900_TO_1970));
 }
 

@@ -90,7 +90,10 @@ static bool get_arg_int(const char *req, const char *arg, int32_t *dst, int32_t 
 
 #ifdef SOCK_SERV
 static int32_t sockstr_read(UW_STREAM str, uint8_t *dst, uint32_t len) {
-  int32_t r = recv((intptr_t)str->user, dst, len, 0);
+  const int timeout = 600;
+  lwip_setsockopt((intptr_t)str->user, SOL_SOCKET, SO_RCVTIMEO,  (char *) &timeout,
+      sizeof(timeout));
+  int32_t r = lwip_recv((intptr_t)str->user, dst, len, 0);
   if (r < 0) {
     printf("sockstr_rd err:%i\n", get_errno((intptr_t)str->user));
   }
@@ -879,6 +882,12 @@ void server_task(void *pvParameters) {
       return;
     }
 
+#if 0
+    const int timeout = 1000;
+    lwip_setsockopt(sock_fd, SOL_SOCKET, SO_RCVTIMEO, (char *) &timeout,
+        sizeof(timeout));
+#endif
+
     lwip_listen(sock_fd, 3);
     socklen_t addr_size = sizeof(local);
     printf("listening to port 80\n");
@@ -891,24 +900,6 @@ void server_task(void *pvParameters) {
       }
       printf("client accepted\n");
 
-#if 0
-       {
-        struct timeval timeout = {
-            .tv_sec = 3,
-            .tv_usec = 0
-        };
-
-        if (lwip_setsockopt(sock_fd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) != 0) {
-          printf("set recvtmo err %i\n", get_errno(sock_fd));
-        }
-        if (lwip_setsockopt(sock_fd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout)) != 0) {
-          printf("set sendtmo err %i\n", get_errno(sock_fd));
-        }
-        if (lwip_fcntl(sock_fd, F_SETFL, O_NONBLOCK) != 0) {
-          printf("set nonblock err %i\n", get_errno(sock_fd));
-        }
-      }
-#endif
       make_tcp_stream(&_stream_tcp, client_fd);
       UWEB_parse(&_stream_tcp, &_stream_tcp);
 
