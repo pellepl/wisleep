@@ -199,20 +199,20 @@ void WB_init(void) {
 }
 
 
-static s32_t cli_time(u32_t argc) {
-  tx_buf[0] = 0x00;
-  umac_tx_pkt(&um, TRUE, tx_buf, 1);
-  return CLI_OK;
-}
-
-static s32_t cli_scan(u32_t argc) {
-  tx_buf[0] = 0x01;
-  umac_tx_pkt(&um, TRUE, tx_buf, 1);
+static s32_t cli_udp(u32_t argc) {
+  tx_buf[0] = P_ESP_SEND_UDP;
+  tx_buf[1] = 0xff;
+  tx_buf[2] = 0xff;
+  tx_buf[3] = 0xff;
+  tx_buf[4] = 0xff;
+  tx_buf[5] = (12345 >> 8);
+  tx_buf[6] = (12345 & 0xff);
+  sprint((char *)&tx_buf[7], "Hello world\n");
+  umac_tx_pkt(&um, TRUE, tx_buf, 8+12);
   return CLI_OK;
 }
 
 CLI_MENU_START(wifi)
-CLI_FUNC("time", cli_time, "Send time packet")
-CLI_FUNC("scan", cli_scan, "Scans APs")
+CLI_FUNC("udp", cli_udp, "Test send an UDP broadcast to port 12345")
 CLI_MENU_END
 

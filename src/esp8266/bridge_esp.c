@@ -17,7 +17,8 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
-
+#include "udputil.h"
+#include "systasks.h"
 #include "../protocol.h"
 
 static xQueueHandle syncq;
@@ -102,6 +103,7 @@ void bridge_pkt_acked(uint8_t seqno, uint8_t *data, uint16_t len) {
     lamp.rgb = (data[3] << 16) | (data[4] << 8) | (data[5]);
     printf("lamp ena:%i int:%i rgb:%06x\n", lamp.ena, lamp.intensity, lamp.rgb);
     break;
+
   default:
     break;
   }
@@ -117,7 +119,28 @@ void bridge_pkt_acked(uint8_t seqno, uint8_t *data, uint16_t len) {
 /////////////////////////////////////////////////////
 
 void bridge_rx_pkt(umac_pkt *pkt, bool resent) {
+  printf("rx pkt %i, cmd %02x, len %i\n", pkt->seqno, pkt->data[0], pkt->length);
+  if (pkt->length == 0) return;
+  uint8_t *data = pkt->data;
+  switch(data[0]) {
+  case P_ESP_SEND_UDP:
+    if (resent) break;
+    udputil_config(
+        (data[1] << 24) | (data[2] << 16) | (data[3] << 8) | data[4], // ip
+        (data[5] << 8) | (data[6]),  // port
+        0,
+        &data[7], // data
+        pkt->length - 8 // len
+      );
+    //int res = udp_send();
+    //printf("sending udp res: %i\n", res);
+    //uint8_t tx_reply = res == 0 ? 1 : 0;
+    //bridge_tx_reply(&tx_reply, 1);
+    systask_call(SYS_UDP_SEND, false);
+  break;
 
+
+  }
 }
 
 /////////////////////////////////////////////////////

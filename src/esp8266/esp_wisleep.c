@@ -23,7 +23,10 @@
 #include "bridge_esp.h"
 #include "systasks.h"
 
+#include "esp/hwrand.h"
 
+
+uint32_t device_id;
 static umac um;
 static unsigned char rx_buf[768];
 static unsigned char tx_buf[768];
@@ -132,7 +135,7 @@ void user_init(void) {
   bool setup_ap = true;
 
   systask_init();
-
+  device_id = 0;
   fs_init();
   if (fs_mount() >= 0) {
 #if 0
@@ -146,6 +149,8 @@ void user_init(void) {
     }
     fs_closedir(&d);
 #endif
+
+    // read preferred ssid
     spiffs_file fd_ssid = fs_open(".ssid", SPIFFS_RDONLY, 0);
     if (fd_ssid > 0) {
       if (fs_read(fd_ssid, (uint8_t *)ap_cred, sizeof(ap_cred)) > 0) {
@@ -164,8 +169,20 @@ void user_init(void) {
       } // if read
     } // if fs_ssid
 
-    //fs_check();
+    // find device id or create one
+    spiffs_file fd_devid = fs_open(".devid", SPIFFS_RDONLY, 0);
+    if (fd_devid < 0) {
+      device_id = hwrand();
+      fd_devid = fs_open(".devid", SPIFFS_O_CREAT | SPIFFS_O_TRUNC | SPIFFS_O_WRONLY | SPIFFS_O_APPEND, 0);
+      fs_write(fd_devid, &device_id, 4);
+      printf("create devid\n");
+    } else {
+      fs_read(fd_devid, &device_id, 4);
+    }
+    fs_close(fd_devid);
+    printf("devid %08x\n", device_id);
 
+    // remove previous scan results
     fs_remove(SYSTASK_AP_SCAN_FILENAME);
   } // if mount
 

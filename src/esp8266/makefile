@@ -13,6 +13,7 @@ PROGRAM_SRC_FILES = \
 	systasks.c \
 	bridge_esp.c \
 	ntp.c \
+	udputil.c \
 	../umac/umac.c \
 	../uweb/src/uweb.c \
 	../uweb/src/uweb_codec.c \

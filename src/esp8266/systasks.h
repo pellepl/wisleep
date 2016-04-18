@@ -21,6 +21,7 @@ typedef enum {
   SYS_FS_CHECK,
   SYS_WIFI_SCAN,
   SYS_NTP_QUERY,
+  SYS_UDP_SEND,
   SYS_TEST,
 } systask_id;
 

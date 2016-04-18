@@ -9,6 +9,7 @@
 #include "fs.h"
 #include "server.h"
 #include "ntp.h"
+#include "udputil.h"
 
 #define SYSTASK_CLAIM_FLAG (1<<31)
 
@@ -61,6 +62,10 @@ static void systask_task(void *pvParameters) {
         break;
       case SYS_NTP_QUERY: {
         ntp_query();
+      }
+      break;
+      case SYS_UDP_SEND: {
+        udputil_send();
       }
       break;
       case SYS_TEST: {
