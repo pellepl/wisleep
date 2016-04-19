@@ -6,18 +6,21 @@
  */
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <sys/types.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <esp8266.h>
 #include <stdio.h>
-#include <ntp.h>
+#include <udputil.h>
+#include <netdb.h>
 #include "espressif/esp_common.h"
 #include "lwip/api.h"
 #include "lwip/err.h"
 #include "lwip/sockets.h"
 
+#define RECV_MAX_LEN  512
 
 static struct {
   uint16_t port;
@@ -25,17 +28,19 @@ static struct {
   uint32_t ipaddr;
   uint8_t *data;
   uint16_t len;
+  udp_recv_cb_fn recv_cb;
 } udp_cfg;
 
-void udputil_config(uint32_t ipaddr, uint16_t port, u16_t timeout, uint8_t *data, uint16_t len) {
+void udputil_config(uint32_t ipaddr, uint16_t port, u16_t timeout, uint8_t *data, uint16_t len, udp_recv_cb_fn recv_cb) {
   udp_cfg.ipaddr = ipaddr;
   udp_cfg.port = port;
   udp_cfg.timeout = timeout;
   udp_cfg.data = data;
   udp_cfg.len = len;
+  udp_cfg.recv_cb = recv_cb;
 }
 
-int udputil_send(void) {
+int _udputil_txrx(bool tx, bool rx) {
   uint8_t *buf = udp_cfg.data;
   const uint16_t len = udp_cfg.len;
   const int port = udp_cfg.port;
@@ -44,25 +49,26 @@ int udputil_send(void) {
 
   dst_address.addr = htonl(udp_cfg.ipaddr);
 
-  int sock_fd = lwip_socket(AF_INET, SOCK_DGRAM, 0);
-  if (sock_fd < 0) {
-    printf("idp socket alloc failed\n");
-    return -1;
-  }
-
   struct sockaddr_in local;
   memset(&local, 0, sizeof(local));
   local.sin_family = AF_INET;
   local.sin_addr.s_addr = htonl(INADDR_ANY);
-  local.sin_port = htons(INADDR_ANY);
+  local.sin_port = htons(port);
 
-  if (lwip_bind(sock_fd, (struct sockaddr *) &local, sizeof(local) < 0)) {
+  int sock_fd = lwip_socket(AF_INET, SOCK_DGRAM, 0);
+  if (sock_fd < 0) {
+    printf("socket alloc failed\n");
+    return -1;
+  }
+
+  if (lwip_bind(sock_fd, (struct sockaddr *)&local, sizeof(local) < 0)) {
     printf("bind failed\n");
     lwip_close(sock_fd);
     return -1;
   }
 
   if (timeout) {
+    printf("UDP timeout\n");
     lwip_setsockopt(sock_fd, SOL_SOCKET, SO_RCVTIMEO, (char *) &timeout,
         sizeof(timeout));
   }
@@ -70,7 +76,7 @@ int udputil_send(void) {
   int broadcast_perm = 1;
   if ((dst_address.addr == 0xffffffff)) {
     printf("UDP broadcast\n");
-    if (setsockopt(sock_fd, SOL_SOCKET, SO_BROADCAST, (void *)&broadcast_perm, sizeof(broadcast_perm)) < 0) {
+    if (lwip_setsockopt(sock_fd, SOL_SOCKET, SO_BROADCAST, (void *)&broadcast_perm, sizeof(broadcast_perm)) < 0) {
       printf("set broadcast perm failed\n");
       lwip_close(sock_fd);
       return -1;
@@ -83,14 +89,42 @@ int udputil_send(void) {
   remote.sin_port = htons(port);
   inet_addr_from_ipaddr(&remote.sin_addr, &dst_address);
 
-  printf("sendto %08x:%i\n", dst_address.addr, port);
-  if (!lwip_sendto(sock_fd, buf, len, 0,
-      (struct sockaddr *) &remote, sizeof(remote))) {
-    printf("sendto failed\n");
-    closesocket(sock_fd);
-    return -1;
+  if (tx) {
+    printf("sendto %08x:%i\n", dst_address.addr, port);
+    if (!lwip_sendto(sock_fd, buf, len, 0,
+        (struct sockaddr *) &remote, sizeof(remote))) {
+      printf("sendto failed\n");
+      closesocket(sock_fd);
+      return -1;
+    }
   }
+
+  if (rx) {
+    printf("recvfrom %08x:%i\n", local.sin_addr.s_addr, port);
+    int tolen = sizeof(remote);
+    int size = lwip_recvfrom(sock_fd, buf, RECV_MAX_LEN, 0,
+        (struct sockaddr *) &remote, (socklen_t *) &tolen);
+    if (size <= 0) {
+      printf("recv failed %i\n", size);
+      closesocket(sock_fd);
+      return -1;
+    }
+  }
+
 
   closesocket(sock_fd);
   return 0;
 }
+
+int udputil_recv(void) {
+  return _udputil_txrx(false, true);
+}
+
+int udputil_send(void) {
+  return _udputil_txrx(true, false);
+}
+
+int udputil_send_recv(void){
+  return _udputil_txrx(true, true);
+}
+

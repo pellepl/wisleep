@@ -127,16 +127,37 @@ void bridge_rx_pkt(umac_pkt *pkt, bool resent) {
     if (resent) break;
     udputil_config(
         (data[1] << 24) | (data[2] << 16) | (data[3] << 8) | data[4], // ip
-        (data[5] << 8) | (data[6]),  // port
-        0,
-        &data[7], // data
-        pkt->length - 8 // len
+        (data[5] << 8) | (data[6]),                                   // port
+        0,                                                            // timeout
+        &data[7],                                                     // data
+        pkt->length - 8,                                              // len,
+        NULL                                                          // recv_cb
       );
-    //int res = udp_send();
-    //printf("sending udp res: %i\n", res);
-    //uint8_t tx_reply = res == 0 ? 1 : 0;
-    //bridge_tx_reply(&tx_reply, 1);
     systask_call(SYS_UDP_SEND, false);
+  break;
+  case P_ESP_RECV_UDP:
+    if (resent) break;
+    udputil_config(
+        (data[1] << 24) | (data[2] << 16) | (data[3] << 8) | data[4], // ip
+        (data[5] << 8) | (data[6]),                                   // port
+        (data[7] << 8) | (data[8]),                                   // timeout
+        NULL,                                                         // data
+        0,                                                            // len,
+        NULL                                                          // recv_cb TODO
+      );
+    systask_call(SYS_UDP_RECV, false);
+  break;
+  case P_ESP_SEND_RECV_UDP:
+    if (resent) break;
+    udputil_config(
+        (data[1] << 24) | (data[2] << 16) | (data[3] << 8) | data[4], // ip
+        (data[5] << 8) | (data[6]),                                   // port
+        (data[7] << 8) | (data[8]),                                   // timeout
+        &data[9],                                                     // data
+        pkt->length - 10,                                             // len,
+        NULL                                                          // recv_cb TODO
+      );
+    systask_call(SYS_UDP_SEND_RECV, false);
   break;
 
 

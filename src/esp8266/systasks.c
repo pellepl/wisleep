@@ -68,6 +68,14 @@ static void systask_task(void *pvParameters) {
         udputil_send();
       }
       break;
+      case SYS_UDP_RECV: {
+        udputil_recv();
+      }
+      break;
+      case SYS_UDP_SEND_RECV: {
+        udputil_send_recv();
+      }
+      break;
       case SYS_TEST: {
         uint32_t progress;
         server_claim_busy();
