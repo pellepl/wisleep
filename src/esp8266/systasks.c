@@ -10,6 +10,7 @@
 #include "server.h"
 #include "ntp.h"
 #include "udputil.h"
+#include "bridge_esp.h"
 
 #define SYSTASK_CLAIM_FLAG (1<<31)
 
@@ -74,6 +75,10 @@ static void systask_task(void *pvParameters) {
       break;
       case SYS_UDP_SEND_RECV: {
         udputil_send_recv();
+      }
+      break;
+      case SYS_PING: {
+        bridge_ping();
       }
       break;
       case SYS_TEST: {

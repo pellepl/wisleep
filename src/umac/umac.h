@@ -76,7 +76,7 @@
 #define CFG_UMAC_TICK_TYPE           uint32_t
 #endif
 
-#define UMAC_PREAMBLE                0x5a
+#define UMAC_PREAMBLE                0xfd
 
 #define UMAC_NACK_ERR_NOT_PREAMBLE   0x01
 #define UMAC_NACK_ERR_BAD_CRC        0x02

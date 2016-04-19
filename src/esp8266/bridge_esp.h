@@ -22,6 +22,7 @@ typedef struct {
 
 void bridge_init(void);
 
+void bridge_ping(void);
 void bridge_lamp_set_ena(bool ena);
 void bridge_lamp_set_intensity(uint8_t i);
 void bridge_lamp_set_color(uint32_t rgb);

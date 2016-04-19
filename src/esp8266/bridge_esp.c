@@ -20,10 +20,24 @@
 #include "udputil.h"
 #include "systasks.h"
 #include "../protocol.h"
+#include <esp/hwrand.h>
 
 static xQueueHandle syncq;
 static uint32_t sync_seqno;
 static lamp_status lamp;
+static uint32_t ping_val;
+
+void bridge_ping(void) {
+  ping_val = hwrand();
+  uint8_t pkt[] = {
+      P_STM_HELLO,
+      (ping_val >> 24),
+      (ping_val >> 16),
+      (ping_val >> 8),
+      (ping_val)
+  };
+  bridge_tx_pkt(true, pkt, sizeof(pkt));
+}
 
 void bridge_lamp_set_color(uint32_t rgb) {
   uint8_t pkt[] = {
@@ -88,6 +102,19 @@ void bridge_pkt_acked(uint8_t seqno, uint8_t *data, uint16_t len) {
   printf("ack pkt %i, cmd %02x, len %i\n", seqno, data[0], len);
   if (len == 0) return;
   switch (data[0]) {
+  case P_STM_HELLO: {
+    uint32_t ping_val_rcv =
+        (data[1]<<24) |
+        (data[2]<<16) |
+        (data[3]<<8) |
+        data[4];
+    if (ping_val == ping_val_rcv) {
+      printf("PONG ok\n");
+    } else {
+      printf("PONG bad\n");
+    }
+    break;
+  }
   case P_STM_LAMP_GET_ENA:
     lamp.ena = data[1] != 0;
     break;
@@ -123,6 +150,9 @@ void bridge_rx_pkt(umac_pkt *pkt, bool resent) {
   if (pkt->length == 0) return;
   uint8_t *data = pkt->data;
   switch(data[0]) {
+  case P_ESP_HELLO:
+    bridge_tx_reply(data, pkt->length);
+  break;
   case P_ESP_SEND_UDP:
     if (resent) break;
     udputil_config(
@@ -167,7 +197,15 @@ void bridge_rx_pkt(umac_pkt *pkt, bool resent) {
 /////////////////////////////////////////////////////
 
 void bridge_timeout(umac_pkt *pkt) {
-
+  if (pkt->length == 0) return;
+  uint8_t *data = pkt->data;
+  switch(data[0]) {
+  case P_ESP_HELLO:
+    printf("PING missed\n");
+    break;
+  default:
+    break;
+  }
 }
 
 int bridge_tx_pkt(uint8_t ack, uint8_t *buf, uint16_t len) {

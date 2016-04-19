@@ -27,6 +27,30 @@ static u8_t tx_ack_buf[768];
 static umac um;
 static task_timer umac_timer;
 static task *umac_timer_task;
+static u32_t ping_val;
+static sys_time ping_snd;
+
+static u8_t * u32tomem(u8_t *b, uint32_t v) {
+  *b++ = v>>24;
+  *b++ = v>>16;
+  *b++ = v>>8;
+  *b++ = v;
+  return b;
+}
+
+static u8_t * u16tomem(u8_t *b, uint32_t v) {
+  *b++ = v>>8;
+  *b++ = v;
+  return b;
+}
+
+static u32_t memtou32(u8_t *b) {
+  return (b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3];
+}
+
+static u16_t memtou16(u8_t *b) {
+  return (b[0] << 8) | b[1];
+}
 
 static void um_impl_request_future_tick(umtick delta) {
   TASK_start_timer(umac_timer_task, &umac_timer, 0, NULL, delta, 0, "umtim");
@@ -49,10 +73,28 @@ static void um_impl_tx_buf(u8_t *b, u16_t len) {
 }
 
 static void um_impl_tx_pkt_acked(u8_t seqno, u8_t *data, u16_t len) {
-
+  if (len == 0) return;
+  switch(data[0]) {
+  case P_ESP_HELLO: {
+    sys_time ping_rcv = SYS_get_time_ms();
+    u32_t rec_ping_val = memtou32(&data[1]);
+    if (rec_ping_val == ping_val) {
+      print("PONG ok, turnaround %i ms\n", ping_rcv - ping_snd);
+    } else {
+      print("PONG bad, turnaround %i ms\n", ping_rcv - ping_snd);
+    }
+  }
+    break;
+  default:
+    break;
+  }
 }
 
 static void um_impl_timeout(umac_pkt *pkt) {
+  if (pkt->length == 0) return;
+  if (pkt->data[0] == P_ESP_HELLO) {
+    print("PONG missed\n");
+  }
 
 }
 
@@ -86,6 +128,11 @@ static void task_tick(u32_t a, void *p) {
 static void um_impl_rx_pkt(umac_pkt *pkt) {
   print("pkt %02x\n", pkt->data[0]);
   switch (pkt->data[0])  {
+  case P_STM_HELLO: {
+    memcpy(tx_ack_buf, pkt->data, pkt->length);
+    umac_tx_reply_ack(&um, tx_ack_buf, pkt->length);
+  }
+  break;
   case P_STM_LAMP_ENA: {
     LAMP_enable(pkt->data[1] != 0);
   }
@@ -201,12 +248,8 @@ void WB_init(void) {
 
 static s32_t cli_udp_tx(u32_t argc) {
   tx_buf[0] = P_ESP_SEND_UDP;
-  tx_buf[1] = 0xff;
-  tx_buf[2] = 0xff;
-  tx_buf[3] = 0xff;
-  tx_buf[4] = 0xff;
-  tx_buf[5] = (12345 >> 8);
-  tx_buf[6] = (12345 & 0xff);
+  u32tomem(&tx_buf[1], 0xffffff);
+  u16tomem(&tx_buf[5], 12345);
   sprint((char *)&tx_buf[7], "Hello world\n");
   umac_tx_pkt(&um, TRUE, tx_buf, 8+12);
   return CLI_OK;
@@ -214,19 +257,24 @@ static s32_t cli_udp_tx(u32_t argc) {
 
 static s32_t cli_udp_rx(u32_t argc) {
   tx_buf[0] = P_ESP_RECV_UDP;
-  tx_buf[1] = 0xff;
-  tx_buf[2] = 0xff;
-  tx_buf[3] = 0xff;
-  tx_buf[4] = 0xff;
-  tx_buf[5] = (12345 >> 8);
-  tx_buf[6] = (12345 & 0xff);
-  tx_buf[7] = (30000 >> 8);
-  tx_buf[8] = (30000 & 0xff);
+  u32tomem(&tx_buf[1], 0xffffff);
+  u16tomem(&tx_buf[5], 12345);
+  u16tomem(&tx_buf[7], 30000);
   umac_tx_pkt(&um, TRUE, tx_buf, 9);
   return CLI_OK;
 }
 
+static s32_t cli_hello(u32_t argc) {
+  ping_val = rand_next();
+  tx_buf[0] = P_ESP_HELLO;
+  u32tomem(&tx_buf[1], ping_val);
+  umac_tx_pkt(&um, TRUE, tx_buf, 5);
+  ping_snd = SYS_get_time_ms();
+  return CLI_OK;
+}
+
 CLI_MENU_START(wifi)
+CLI_FUNC("ping", cli_hello, "Pings ESP8266")
 CLI_FUNC("udp_tx", cli_udp_tx, "Test send an UDP broadcast to port 12345")
 CLI_FUNC("udp_rx", cli_udp_rx, "Test receive an UDP broadcast to port 12345")
 CLI_MENU_END

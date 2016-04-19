@@ -47,6 +47,10 @@ uweb_response server_actions(
     make_char_stream_copy(res, buf);
     return UWEB_CHUNKED;
   }
+  else if (get_arg_str(req->resource, "ping", arg)) {
+    bridge_ping();
+    return UWEB_OK;
+  }
   make_char_stream(res, NOTFOUND);
   *http_status = S404_NOT_FOUND;
   return UWEB_CHUNKED;

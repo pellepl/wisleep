@@ -24,6 +24,7 @@ typedef enum {
   SYS_UDP_SEND,
   SYS_UDP_RECV,
   SYS_UDP_SEND_RECV,
+  SYS_PING,
   SYS_TEST,
 } systask_id;
 
