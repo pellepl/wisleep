@@ -13,6 +13,7 @@
 
 #define MINIUTILS_PRINT_FLOAT
 #define MINIUTILS_PRINT_LONGLONG
+#define MINIUTILS_BASE64
 
 #define PUTC(p, c)  \
   if ((int)(p) < 256) \

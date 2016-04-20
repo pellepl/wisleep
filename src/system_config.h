@@ -214,7 +214,7 @@ typedef u16_t system_counter_type;
 #define DBG_MS_PREFIX          1
 
 // enable or disable tracing
-//#define DBG_TRACE_MON
+#define DBG_TRACE_MON
 #define TRACE_SIZE            (64)
 
 #define VALID_RAM(x) \
