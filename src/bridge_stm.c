@@ -195,6 +195,14 @@ static void um_impl_rx_pkt(umac_pkt *pkt) {
     umac_tx_reply_ack(&um, tx_ack_buf, ix);
   }
   break;
+  case P_STM_RECV_UDP: {
+    //u32_t ipaddr = memtou32(&pkt->data[1]);
+    u16_t udp_len = pkt->length-5;
+    print("Got UDP data from %i.%i.%i.%i, %i bytes\n", pkt->data[4], pkt->data[3], pkt->data[1], pkt->data[1], udp_len);
+    printbuf(IOSTD, &pkt->data[5], udp_len);
+    break;
+  }
+
   default:
     print("unhandled pkt %02x\n", pkt->data[0]);
   break;

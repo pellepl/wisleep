@@ -26,6 +26,12 @@ static xQueueHandle syncq;
 static uint32_t sync_seqno;
 static lamp_status lamp;
 static uint32_t ping_val;
+static struct {
+  uint8_t udp_pkt_preamble[5];
+  uint8_t udp_rx_buf[512];
+} udp_rx;
+
+static void bridge_udp_recv_cb(int res, uint32_t ip, uint8_t *buf, uint16_t len);
 
 void bridge_ping(void) {
   ping_val = hwrand();
@@ -96,7 +102,7 @@ lamp_status *bridge_lamp_get_status(bool refresh_syncronously) {
   return &lamp;
 }
 
-/////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////
 
 void bridge_pkt_acked(uint8_t seqno, uint8_t *data, uint16_t len) {
   printf("ack pkt %i, cmd %02x, len %i\n", seqno, data[0], len);
@@ -143,7 +149,7 @@ void bridge_pkt_acked(uint8_t seqno, uint8_t *data, uint16_t len) {
 
 }
 
-/////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////
 
 void bridge_rx_pkt(umac_pkt *pkt, bool resent) {
   printf("rx pkt %i, cmd %02x, len %i\n", pkt->seqno, pkt->data[0], pkt->length);
@@ -159,8 +165,9 @@ void bridge_rx_pkt(umac_pkt *pkt, bool resent) {
         (data[1] << 24) | (data[2] << 16) | (data[3] << 8) | data[4], // ip
         (data[5] << 8) | (data[6]),                                   // port
         0,                                                            // timeout
-        &data[7],                                                     // data
+        &data[7],                                                     // txdata
         pkt->length - 8,                                              // len,
+        NULL,                                                         // rxdata
         NULL                                                          // recv_cb
       );
     systask_call(SYS_UDP_SEND, false);
@@ -171,9 +178,10 @@ void bridge_rx_pkt(umac_pkt *pkt, bool resent) {
         (data[1] << 24) | (data[2] << 16) | (data[3] << 8) | data[4], // ip
         (data[5] << 8) | (data[6]),                                   // port
         (data[7] << 8) | (data[8]),                                   // timeout
-        NULL,                                                         // data
+        NULL,                                                         // txdata
         0,                                                            // len,
-        NULL                                                          // recv_cb TODO
+        udp_rx.udp_rx_buf,                                            // rxdata
+        bridge_udp_recv_cb                                            // recv_cb
       );
     systask_call(SYS_UDP_RECV, false);
   break;
@@ -183,9 +191,10 @@ void bridge_rx_pkt(umac_pkt *pkt, bool resent) {
         (data[1] << 24) | (data[2] << 16) | (data[3] << 8) | data[4], // ip
         (data[5] << 8) | (data[6]),                                   // port
         (data[7] << 8) | (data[8]),                                   // timeout
-        &data[9],                                                     // data
+        &data[9],                                                     // txdata
         pkt->length - 10,                                             // len,
-        NULL                                                          // recv_cb TODO
+        udp_rx.udp_rx_buf,                                            // rxdata
+        bridge_udp_recv_cb                                            // recv_cb
       );
     systask_call(SYS_UDP_SEND_RECV, false);
   break;
@@ -194,7 +203,7 @@ void bridge_rx_pkt(umac_pkt *pkt, bool resent) {
   }
 }
 
-/////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////
 
 void bridge_timeout(umac_pkt *pkt) {
   if (pkt->length == 0) return;
@@ -219,4 +228,16 @@ void bridge_tx_reply(uint8_t *buf, uint16_t len) {
 void bridge_init(void) {
   syncq = xQueueCreate(1, sizeof(uint32_t));
   sync_seqno = -1;
+}
+
+///////////////////////////////////////////////////////////
+
+static void bridge_udp_recv_cb(int res, uint32_t ip, uint8_t *buf, uint16_t len) {
+  if (res < 0) return;
+  udp_rx.udp_pkt_preamble[0] = P_STM_RECV_UDP;
+  udp_rx.udp_pkt_preamble[1] = ip >> 24;
+  udp_rx.udp_pkt_preamble[2] = ip >> 16;
+  udp_rx.udp_pkt_preamble[3] = ip >> 8;
+  udp_rx.udp_pkt_preamble[4] = ip;
+  bridge_tx_pkt(false, (uint8_t *)&udp_rx, len+sizeof(udp_rx.udp_pkt_preamble));
 }
