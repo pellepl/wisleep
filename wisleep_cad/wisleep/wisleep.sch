@@ -1427,6 +1427,36 @@ chip</description>
 <text x="-1.5" y="-2.4" size="0.6096" layer="27" font="vector">&gt;VALUE</text>
 <text x="-1.5" y="1.8" size="0.6096" layer="25" font="vector">&gt;NAME</text>
 </package>
+<package name="VSON16">
+<wire x1="-1.6" y1="1.6" x2="1.6" y2="1.6" width="0.1" layer="51"/>
+<wire x1="-1.6" y1="-1.6" x2="-1.6" y2="1.6" width="0.1" layer="51"/>
+<wire x1="-1.6" y1="-1.6" x2="1.6" y2="-1.6" width="0.1" layer="51"/>
+<wire x1="1.6" y1="-1.6" x2="1.6" y2="1.6" width="0.1" layer="51"/>
+<smd name="1" x="-0.75" y="1.75" dx="1.25" dy="0.28" layer="1" roundness="50" rot="R90"/>
+<smd name="2" x="-0.25" y="1.75" dx="1.25" dy="0.28" layer="1" roundness="50" rot="R90"/>
+<smd name="3" x="0.25" y="1.75" dx="1.25" dy="0.28" layer="1" roundness="50" rot="R90"/>
+<smd name="4" x="0.75" y="1.75" dx="1.25" dy="0.28" layer="1" roundness="50" rot="R90"/>
+<smd name="5" x="1.75" y="0.75" dx="1.25" dy="0.28" layer="1" roundness="50" rot="R180"/>
+<smd name="6" x="1.75" y="0.25" dx="1.25" dy="0.28" layer="1" roundness="50" rot="R180"/>
+<smd name="7" x="1.75" y="-0.25" dx="1.25" dy="0.28" layer="1" roundness="50" rot="R180"/>
+<smd name="8" x="1.75" y="-0.75" dx="1.25" dy="0.28" layer="1" roundness="50" rot="R180"/>
+<smd name="9" x="0.75" y="-1.75" dx="1.25" dy="0.28" layer="1" roundness="50" rot="R90"/>
+<smd name="10" x="0.25" y="-1.75" dx="1.25" dy="0.28" layer="1" roundness="50" rot="R90"/>
+<smd name="11" x="-0.25" y="-1.75" dx="1.25" dy="0.28" layer="1" roundness="50" rot="R90"/>
+<smd name="12" x="-0.75" y="-1.75" dx="1.25" dy="0.28" layer="1" roundness="50" rot="R90"/>
+<smd name="13" x="-1.75" y="-0.75" dx="1.25" dy="0.28" layer="1" roundness="50" rot="R180"/>
+<smd name="14" x="-1.75" y="-0.25" dx="1.25" dy="0.28" layer="1" roundness="50" rot="R180"/>
+<smd name="15" x="-1.75" y="0.25" dx="1.25" dy="0.28" layer="1" roundness="50" rot="R180"/>
+<smd name="16" x="-1.75" y="0.75" dx="1.25" dy="0.28" layer="1" roundness="50" rot="R180"/>
+<smd name="PAD" x="0" y="0" dx="1.2" dy="1.2" layer="1"/>
+<circle x="-1.45" y="1.45" radius="0.21213125" width="0.1" layer="21"/>
+<wire x1="-1.35" y1="-1.35" x2="1.35" y2="-1.35" width="0.1" layer="21"/>
+<wire x1="1.35" y1="-1.35" x2="1.35" y2="1.35" width="0.1" layer="21"/>
+<wire x1="1.35" y1="1.35" x2="-1.2" y2="1.35" width="0.1" layer="21"/>
+<wire x1="-1.35" y1="-1.35" x2="-1.35" y2="1.2" width="0.1" layer="21"/>
+<text x="-4" y="2.5" size="1.778" layer="25" font="vector">&gt;NAME</text>
+<text x="-4" y="-4.5" size="1.778" layer="27" font="vector">&gt;VALUE</text>
+</package>
 </packages>
 <symbols>
 <symbol name="CAP">
@@ -1497,6 +1527,34 @@ chip</description>
 <pin name="THERM" x="0" y="-10.16" length="middle" direction="pwr" rot="R90"/>
 <text x="-12.7" y="12.7" size="1.6764" layer="95" font="vector">&gt;NAME</text>
 <text x="2.54" y="-7.62" size="1.6764" layer="96" font="vector">&gt;VALUE</text>
+</symbol>
+<symbol name="BQ2407X">
+<description>BQ24072
+
+1.5-A USB-Friendly Li-Ion Battery Charger and Power-Path Management IC</description>
+<pin name="BAT1" x="-20.32" y="17.78" length="middle" direction="pwr"/>
+<pin name="BAT2" x="-20.32" y="15.24" length="middle" direction="pwr"/>
+<pin name="_CE" x="20.32" y="17.78" length="middle" direction="in" function="dot" rot="R180"/>
+<pin name="_CHG" x="20.32" y="-12.7" length="middle" direction="out" function="dot" rot="R180"/>
+<pin name="EN1" x="20.32" y="12.7" length="middle" direction="in" rot="R180"/>
+<pin name="EN2" x="20.32" y="10.16" length="middle" direction="in" rot="R180"/>
+<pin name="_PGOOD" x="20.32" y="-15.24" length="middle" direction="out" function="dot" rot="R180"/>
+<pin name="IN" x="-20.32" y="2.54" length="middle" direction="pwr"/>
+<pin name="TD" x="20.32" y="15.24" length="middle" direction="in" rot="R180"/>
+<pin name="OUT1" x="-20.32" y="-5.08" length="middle" direction="pwr"/>
+<pin name="ILIM" x="20.32" y="2.54" length="middle" direction="in" rot="R180"/>
+<pin name="ISET" x="20.32" y="-2.54" length="middle" direction="in" rot="R180"/>
+<pin name="TMR" x="20.32" y="-7.62" length="middle" direction="in" rot="R180"/>
+<pin name="TS" x="-20.32" y="12.7" length="middle"/>
+<pin name="GND" x="-20.32" y="-15.24" length="middle" direction="pwr"/>
+<pin name="PAD_GND" x="-5.08" y="-22.86" length="middle" direction="pwr" rot="R90"/>
+<wire x1="-15.24" y1="20.32" x2="-15.24" y2="-17.78" width="0.4064" layer="94"/>
+<wire x1="-15.24" y1="-17.78" x2="15.24" y2="-17.78" width="0.4064" layer="94"/>
+<wire x1="15.24" y1="-17.78" x2="15.24" y2="20.32" width="0.4064" layer="94"/>
+<wire x1="15.24" y1="20.32" x2="-15.24" y2="20.32" width="0.4064" layer="94"/>
+<text x="-2.54" y="-20.32" size="1.778" layer="95">&gt;NAME</text>
+<text x="-15.24" y="22.86" size="1.778" layer="96">&gt;VALUE</text>
+<pin name="OUT2" x="-20.32" y="-7.62" length="middle" direction="pwr"/>
 </symbol>
 </symbols>
 <devicesets>
@@ -1776,6 +1834,39 @@ Basic schematic elements and footprints for 0603, 1206, and PTH 1/10th watt (sma
 </connects>
 <technologies>
 <technology name="OWN"/>
+</technologies>
+</device>
+</devices>
+</deviceset>
+<deviceset name="BQ24072">
+<description>bq24072
+1.5-A USB-Friendly Li-Ion Battery Charger and Power-Path Management IC</description>
+<gates>
+<gate name="G$1" symbol="BQ2407X" x="0" y="0"/>
+</gates>
+<devices>
+<device name="VSON16" package="VSON16">
+<connects>
+<connect gate="G$1" pin="BAT1" pad="2"/>
+<connect gate="G$1" pin="BAT2" pad="3"/>
+<connect gate="G$1" pin="EN1" pad="6"/>
+<connect gate="G$1" pin="EN2" pad="5"/>
+<connect gate="G$1" pin="GND" pad="8"/>
+<connect gate="G$1" pin="ILIM" pad="12"/>
+<connect gate="G$1" pin="IN" pad="13"/>
+<connect gate="G$1" pin="ISET" pad="16"/>
+<connect gate="G$1" pin="OUT1" pad="10"/>
+<connect gate="G$1" pin="OUT2" pad="11"/>
+<connect gate="G$1" pin="PAD_GND" pad="PAD"/>
+<connect gate="G$1" pin="TD" pad="15"/>
+<connect gate="G$1" pin="TMR" pad="14"/>
+<connect gate="G$1" pin="TS" pad="1"/>
+<connect gate="G$1" pin="_CE" pad="4"/>
+<connect gate="G$1" pin="_CHG" pad="9"/>
+<connect gate="G$1" pin="_PGOOD" pad="7"/>
+</connects>
+<technologies>
+<technology name=""/>
 </technologies>
 </device>
 </devices>
@@ -2630,75 +2721,6 @@ will be further integrated into the Sparkfun Library for other footprints.  It c
 </deviceset>
 </devicesets>
 </library>
-<library name="SparkFun-PowerIC">
-<description>&lt;h3&gt;SparkFun Electronics' preferred foot prints&lt;/h3&gt;
-In this library you'll find drivers, regulators, and amplifiers.&lt;br&gt;&lt;br&gt;
-We've spent an enormous amount of time creating and checking these footprints and parts, but it is the end user's responsibility to ensure correctness and suitablity for a given componet or application. If you enjoy using this library, please buy one of our products at www.sparkfun.com.
-&lt;br&gt;&lt;br&gt;
-&lt;b&gt;Licensing:&lt;/b&gt; CC v3.0 Share-Alike You are welcome to use this library for commercial purposes. For attribution, we ask that when you begin to sell your device using our footprint, you email us with a link to the product being sold. We want bragging rights that we helped (in a very small part) to create your 8th world wonder. We would like the opportunity to feature your device on our homepage.</description>
-<packages>
-<package name="SOT23-5">
-<description>&lt;b&gt;Small Outline Transistor&lt;/b&gt;</description>
-<wire x1="1.4224" y1="0.4294" x2="1.4224" y2="-0.4294" width="0.2032" layer="21"/>
-<wire x1="1.4" y1="-0.8" x2="-1.4" y2="-0.8" width="0.1524" layer="51"/>
-<wire x1="-1.4224" y1="-0.4294" x2="-1.4224" y2="0.4294" width="0.2032" layer="21"/>
-<wire x1="-1.4" y1="0.8" x2="1.4" y2="0.8" width="0.1524" layer="51"/>
-<wire x1="-0.2684" y1="0.8104" x2="0.2684" y2="0.8104" width="0.2032" layer="21"/>
-<wire x1="1.4" y1="0.8" x2="1.4" y2="-0.8" width="0.1524" layer="51"/>
-<wire x1="-1.4" y1="0.8" x2="-1.4" y2="-0.8" width="0.1524" layer="51"/>
-<smd name="1" x="-0.95" y="-1.3001" dx="0.55" dy="1.2" layer="1"/>
-<smd name="2" x="0" y="-1.3001" dx="0.55" dy="1.2" layer="1"/>
-<smd name="3" x="0.95" y="-1.3001" dx="0.55" dy="1.2" layer="1"/>
-<smd name="4" x="0.95" y="1.3001" dx="0.55" dy="1.2" layer="1"/>
-<smd name="5" x="-0.95" y="1.3001" dx="0.55" dy="1.2" layer="1"/>
-<text x="-0.889" y="2.159" size="0.4064" layer="25">&gt;NAME</text>
-<text x="-0.9525" y="-0.1905" size="0.4064" layer="27">&gt;VALUE</text>
-<rectangle x1="-1.2" y1="-1.5" x2="-0.7" y2="-0.85" layer="51"/>
-<rectangle x1="-0.25" y1="-1.5" x2="0.25" y2="-0.85" layer="51"/>
-<rectangle x1="0.7" y1="-1.5" x2="1.2" y2="-0.85" layer="51"/>
-<rectangle x1="0.7" y1="0.85" x2="1.2" y2="1.5" layer="51"/>
-<rectangle x1="-1.2" y1="0.85" x2="-0.7" y2="1.5" layer="51"/>
-</package>
-</packages>
-<symbols>
-<symbol name="MAX1555">
-<wire x1="-10.16" y1="5.08" x2="-10.16" y2="-5.08" width="0.254" layer="94"/>
-<wire x1="-10.16" y1="-5.08" x2="7.62" y2="-5.08" width="0.254" layer="94"/>
-<wire x1="7.62" y1="-5.08" x2="7.62" y2="5.08" width="0.254" layer="94"/>
-<wire x1="7.62" y1="5.08" x2="-10.16" y2="5.08" width="0.254" layer="94"/>
-<text x="-10.16" y="5.842" size="1.778" layer="95">&gt;Name</text>
-<text x="-10.16" y="-7.62" size="1.778" layer="96">&gt;Value</text>
-<pin name="USB" x="-15.24" y="2.54" length="middle"/>
-<pin name="GND" x="-15.24" y="0" length="middle"/>
-<pin name="CHG" x="-15.24" y="-2.54" length="middle"/>
-<pin name="BATT" x="12.7" y="2.54" length="middle" rot="R180"/>
-<pin name="DC" x="12.7" y="-2.54" length="middle" rot="R180"/>
-</symbol>
-</symbols>
-<devicesets>
-<deviceset name="MAX1555" prefix="U">
-<description>&lt;b&gt;MAX1555 Lithium Charger IC&lt;/b&gt;
-SOT-23 Lithium Polymer charging IC. Schematic element and footprint proven. Spark Fun Electronics SKU : COM-00674</description>
-<gates>
-<gate name="G$1" symbol="MAX1555" x="0" y="0"/>
-</gates>
-<devices>
-<device name="" package="SOT23-5">
-<connects>
-<connect gate="G$1" pin="BATT" pad="5"/>
-<connect gate="G$1" pin="CHG" pad="3"/>
-<connect gate="G$1" pin="DC" pad="4"/>
-<connect gate="G$1" pin="GND" pad="2"/>
-<connect gate="G$1" pin="USB" pad="1"/>
-</connects>
-<technologies>
-<technology name=""/>
-</technologies>
-</device>
-</devices>
-</deviceset>
-</devicesets>
-</library>
 <library name="ESP8266-ESP12E">
 <packages>
 <package name="ESP8266-ESP12E">
@@ -3122,14 +3144,13 @@ In this library the device names are the same as the pin names of the symbols, t
 <part name="GND5" library="SparkFun-Aesthetics" deviceset="GND" device=""/>
 <part name="SUPPLY2" library="SparkFun-Aesthetics" deviceset="3.3V" device=""/>
 <part name="GND7" library="SparkFun-Aesthetics" deviceset="GND" device=""/>
-<part name="U1" library="SparkFun-PowerIC" deviceset="MAX1555" device=""/>
 <part name="U$2" library="robot" deviceset="MAX8815A" device="MAX8815A" technology="OWN"/>
 <part name="MDL1" library="ESP8266-ESP12E" deviceset="ESP8266-12E" device="ESP8266-ESP12E"/>
 <part name="J1" library="con-jack" deviceset="JACK-PLUG" device="0"/>
 <part name="JP1" library="SparkFun-Connectors" deviceset="M02" device="LOCK"/>
 <part name="GND6" library="SparkFun-Aesthetics" deviceset="GND" device=""/>
 <part name="SUPPLY4" library="supply2" deviceset="GND2" device="" value="BATGND"/>
-<part name="SUPPLY5" library="supply2" deviceset="GND2" device="" value="BATGND"/>
+<part name="U$3" library="robot" deviceset="BQ24072" device="VSON16"/>
 </parts>
 <sheets>
 <sheet>
@@ -3623,13 +3644,12 @@ In this library the device names are the same as the pin names of the symbols, t
 </plain>
 <instances>
 <instance part="GND7" gate="1" x="71.12" y="149.86"/>
-<instance part="U1" gate="G$1" x="71.12" y="116.84"/>
 <instance part="U$2" gate="G$1" x="71.12" y="170.18"/>
 <instance part="J1" gate="G$1" x="121.92" y="142.24"/>
 <instance part="JP1" gate="G$1" x="147.32" y="144.78" rot="R180"/>
 <instance part="GND6" gate="1" x="129.54" y="132.08"/>
 <instance part="SUPPLY4" gate="G$1" x="137.16" y="132.08"/>
-<instance part="SUPPLY5" gate="G$1" x="48.26" y="111.76"/>
+<instance part="U$3" gate="G$1" x="71.12" y="78.74"/>
 </instances>
 <busses>
 </busses>
@@ -3691,12 +3711,6 @@ In this library the device names are the same as the pin names of the symbols, t
 <wire x1="137.16" y1="139.7" x2="137.16" y2="134.62" width="0.127" layer="91"/>
 <pinref part="SUPPLY4" gate="G$1" pin="GND2"/>
 <junction x="132.08" y="142.24"/>
-</segment>
-<segment>
-<pinref part="U1" gate="G$1" pin="GND"/>
-<pinref part="SUPPLY5" gate="G$1" pin="GND2"/>
-<wire x1="55.88" y1="116.84" x2="48.26" y2="116.84" width="0.127" layer="91"/>
-<wire x1="48.26" y1="116.84" x2="48.26" y2="114.3" width="0.127" layer="91"/>
 </segment>
 </net>
 </nets>
