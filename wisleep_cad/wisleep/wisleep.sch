@@ -1457,6 +1457,58 @@ chip</description>
 <text x="-4" y="2.5" size="1.778" layer="25" font="vector">&gt;NAME</text>
 <text x="-4" y="-4.5" size="1.778" layer="27" font="vector">&gt;VALUE</text>
 </package>
+<package name="SOT223">
+<description>&lt;b&gt;SOT-223&lt;/b&gt;</description>
+<wire x1="3.2766" y1="1.778" x2="3.2766" y2="-1.778" width="0.2032" layer="21"/>
+<wire x1="3.2766" y1="-1.778" x2="-3.2766" y2="-1.778" width="0.2032" layer="21"/>
+<wire x1="-3.2766" y1="-1.778" x2="-3.2766" y2="1.778" width="0.2032" layer="21"/>
+<wire x1="-3.2766" y1="1.778" x2="3.2766" y2="1.778" width="0.2032" layer="21"/>
+<smd name="1" x="-2.3114" y="-3.0988" dx="1.2192" dy="2.2352" layer="1"/>
+<smd name="2" x="0" y="-3.0988" dx="1.2192" dy="2.2352" layer="1"/>
+<smd name="3" x="2.3114" y="-3.0988" dx="1.2192" dy="2.2352" layer="1"/>
+<smd name="4" x="0" y="3.099" dx="3.6" dy="2.2" layer="1"/>
+<text x="-2.54" y="0.0508" size="1.27" layer="25">&gt;NAME</text>
+<text x="-2.54" y="-1.3208" size="1.27" layer="27">&gt;VALUE</text>
+<rectangle x1="-1.6002" y1="1.8034" x2="1.6002" y2="3.6576" layer="51"/>
+<rectangle x1="-0.4318" y1="-3.6576" x2="0.4318" y2="-1.8034" layer="51"/>
+<rectangle x1="-2.7432" y1="-3.6576" x2="-1.8796" y2="-1.8034" layer="51"/>
+<rectangle x1="1.8796" y1="-3.6576" x2="2.7432" y2="-1.8034" layer="51"/>
+<rectangle x1="-1.6002" y1="1.8034" x2="1.6002" y2="3.6576" layer="51"/>
+<rectangle x1="-0.4318" y1="-3.6576" x2="0.4318" y2="-1.8034" layer="51"/>
+<rectangle x1="-2.7432" y1="-3.6576" x2="-1.8796" y2="-1.8034" layer="51"/>
+<rectangle x1="1.8796" y1="-3.6576" x2="2.7432" y2="-1.8034" layer="51"/>
+</package>
+<package name="MSOP08">
+<description>&lt;b&gt;8-Lead micro SO&lt;/b&gt; (RM-8)&lt;p&gt;
+Source: http://www.analog.com/UploadedFiles/Data_Sheets/703465986AD8611_2_0.pdf</description>
+<wire x1="1.624" y1="1.299" x2="1.624" y2="-1.301" width="0.1524" layer="21"/>
+<wire x1="-1.626" y1="-1.301" x2="-1.626" y2="1.299" width="0.1524" layer="21"/>
+<wire x1="1.299" y1="1.624" x2="1.624" y2="1.299" width="0.1524" layer="21" curve="-90"/>
+<wire x1="-1.626" y1="1.299" x2="-1.301" y2="1.624" width="0.1524" layer="21" curve="-90"/>
+<wire x1="-1.626" y1="-1.301" x2="-1.301" y2="-1.626" width="0.1524" layer="21" curve="90"/>
+<wire x1="1.299" y1="-1.626" x2="1.624" y2="-1.301" width="0.1524" layer="21" curve="90"/>
+<wire x1="-1.341" y1="-1.626" x2="1.299" y2="-1.626" width="0.1524" layer="21"/>
+<wire x1="-1.301" y1="1.624" x2="1.299" y2="1.624" width="0.1524" layer="21"/>
+<circle x="-1.0456" y="-1.0406" radius="0.2448" width="0.0508" layer="21"/>
+<smd name="8" x="-0.976" y="2.262" dx="0.4" dy="1" layer="1"/>
+<smd name="7" x="-0.326" y="2.262" dx="0.4" dy="1" layer="1"/>
+<smd name="6" x="0.324" y="2.262" dx="0.4" dy="1" layer="1"/>
+<smd name="5" x="0.974" y="2.262" dx="0.4" dy="1" layer="1"/>
+<smd name="4" x="0.974" y="-2.263" dx="0.4" dy="1" layer="1"/>
+<smd name="3" x="0.324" y="-2.263" dx="0.4" dy="1" layer="1"/>
+<smd name="2" x="-0.326" y="-2.263" dx="0.4" dy="1" layer="1"/>
+<smd name="1" x="-0.976" y="-2.263" dx="0.4" dy="1" layer="1"/>
+<text x="-2.032" y="-2.54" size="1.27" layer="25" ratio="10" rot="R90">&gt;NAME</text>
+<text x="3.302" y="-2.54" size="1.27" layer="27" ratio="10" rot="R90">&gt;VALUE</text>
+<rectangle x1="-1.0975" y1="1.65" x2="-0.8537" y2="2.5057" layer="51"/>
+<rectangle x1="-0.4475" y1="1.65" x2="-0.2037" y2="2.5057" layer="51"/>
+<rectangle x1="0.2025" y1="1.65" x2="0.4463" y2="2.5057" layer="51"/>
+<rectangle x1="0.8525" y1="1.65" x2="1.0963" y2="2.5057" layer="51"/>
+<rectangle x1="-1.0975" y1="-2.5069" x2="-0.8537" y2="-1.65" layer="51"/>
+<rectangle x1="-0.4475" y1="-2.5069" x2="-0.2037" y2="-1.65" layer="51"/>
+<rectangle x1="0.2025" y1="-2.5069" x2="0.4463" y2="-1.65" layer="51"/>
+<rectangle x1="0.8525" y1="-2.5069" x2="1.0963" y2="-1.65" layer="51"/>
+</package>
 </packages>
 <symbols>
 <symbol name="CAP">
@@ -1555,6 +1607,40 @@ chip</description>
 <text x="-2.54" y="-20.32" size="1.778" layer="95">&gt;NAME</text>
 <text x="-15.24" y="22.86" size="1.778" layer="96">&gt;VALUE</text>
 <pin name="OUT2" x="-20.32" y="-7.62" length="middle" direction="pwr"/>
+</symbol>
+<symbol name="MIC5239">
+<description>MIC5239 SOT223
+Low Quiescent Current 500mA μCap
+LDO Regulator</description>
+<pin name="IN" x="-15.24" y="0" length="middle" direction="pwr"/>
+<pin name="OUT" x="15.24" y="0" length="middle" direction="pwr" rot="R180"/>
+<pin name="GND@1" x="0" y="-10.16" length="middle" direction="pwr" rot="R90"/>
+<wire x1="-10.16" y1="5.08" x2="-10.16" y2="-5.08" width="0.4064" layer="94"/>
+<wire x1="-10.16" y1="-5.08" x2="10.16" y2="-5.08" width="0.4064" layer="94"/>
+<wire x1="10.16" y1="-5.08" x2="10.16" y2="5.08" width="0.4064" layer="94"/>
+<wire x1="10.16" y1="5.08" x2="-10.16" y2="5.08" width="0.4064" layer="94"/>
+<text x="-7.62" y="7.62" size="1.778" layer="95">&gt;NAME</text>
+<text x="2.54" y="-7.62" size="1.778" layer="96">&gt;VALUE</text>
+<pin name="GND@2" x="-2.54" y="-10.16" length="middle" direction="pwr" rot="R90"/>
+</symbol>
+<symbol name="MIC5239-8">
+<description>MIC5239
+Low Quiescent Current 500mA μCap
+LDO Regulator</description>
+<pin name="EN" x="-15.24" y="5.08" length="middle" direction="in"/>
+<pin name="FLG" x="-15.24" y="2.54" length="middle" direction="out"/>
+<pin name="IN" x="-15.24" y="0" length="middle" direction="pwr"/>
+<pin name="OUT" x="-15.24" y="-2.54" length="middle" direction="pwr"/>
+<pin name="GND@4" x="15.24" y="-2.54" length="middle" direction="pwr" rot="R180"/>
+<pin name="GND@3" x="15.24" y="0" length="middle" direction="pwr" rot="R180"/>
+<pin name="GND@2" x="15.24" y="2.54" length="middle" direction="pwr" rot="R180"/>
+<pin name="GND@1" x="15.24" y="5.08" length="middle" direction="pwr" rot="R180"/>
+<wire x1="-10.16" y1="7.62" x2="-10.16" y2="-5.08" width="0.4064" layer="94"/>
+<wire x1="-10.16" y1="-5.08" x2="10.16" y2="-5.08" width="0.4064" layer="94"/>
+<wire x1="10.16" y1="-5.08" x2="10.16" y2="7.62" width="0.4064" layer="94"/>
+<wire x1="10.16" y1="7.62" x2="-10.16" y2="7.62" width="0.4064" layer="94"/>
+<text x="-10.16" y="10.16" size="1.778" layer="95">&gt;NAME</text>
+<text x="-10.16" y="-7.62" size="1.778" layer="96">&gt;VALUE</text>
 </symbol>
 </symbols>
 <devicesets>
@@ -1864,6 +1950,46 @@ Basic schematic elements and footprints for 0603, 1206, and PTH 1/10th watt (sma
 <connect gate="G$1" pin="_CE" pad="4"/>
 <connect gate="G$1" pin="_CHG" pad="9"/>
 <connect gate="G$1" pin="_PGOOD" pad="7"/>
+</connects>
+<technologies>
+<technology name=""/>
+</technologies>
+</device>
+</devices>
+</deviceset>
+<deviceset name="MIC5239SOT223">
+<gates>
+<gate name="G$1" symbol="MIC5239" x="0" y="0"/>
+</gates>
+<devices>
+<device name="SOT223" package="SOT223">
+<connects>
+<connect gate="G$1" pin="GND@1" pad="2"/>
+<connect gate="G$1" pin="GND@2" pad="4"/>
+<connect gate="G$1" pin="IN" pad="1"/>
+<connect gate="G$1" pin="OUT" pad="3"/>
+</connects>
+<technologies>
+<technology name=""/>
+</technologies>
+</device>
+</devices>
+</deviceset>
+<deviceset name="MIC5239-8">
+<gates>
+<gate name="G$1" symbol="MIC5239-8" x="0" y="-2.54"/>
+</gates>
+<devices>
+<device name="MSOP" package="MSOP08">
+<connects>
+<connect gate="G$1" pin="EN" pad="1"/>
+<connect gate="G$1" pin="FLG" pad="2"/>
+<connect gate="G$1" pin="GND@1" pad="5"/>
+<connect gate="G$1" pin="GND@2" pad="6"/>
+<connect gate="G$1" pin="GND@3" pad="7"/>
+<connect gate="G$1" pin="GND@4" pad="8"/>
+<connect gate="G$1" pin="IN" pad="3"/>
+<connect gate="G$1" pin="OUT" pad="4"/>
 </connects>
 <technologies>
 <technology name=""/>
@@ -3058,41 +3184,6 @@ Type: &lt;b&gt;SPC4077 / SPC 4078&lt;/b&gt;&lt;p&gt;</description>
 </deviceset>
 </devicesets>
 </library>
-<library name="supply2">
-<description>&lt;b&gt;Supply Symbols&lt;/b&gt;&lt;p&gt;
-GND, VCC, 0V, +5V, -5V, etc.&lt;p&gt;
-Please keep in mind, that these devices are necessary for the
-automatic wiring of the supply signals.&lt;p&gt;
-The pin name defined in the symbol is identical to the net which is to be wired automatically.&lt;p&gt;
-In this library the device names are the same as the pin names of the symbols, therefore the correct signal names appear next to the supply symbols in the schematic.&lt;p&gt;
-&lt;author&gt;Created by librarian@cadsoft.de&lt;/author&gt;</description>
-<packages>
-</packages>
-<symbols>
-<symbol name="GND2">
-<wire x1="-1.27" y1="0" x2="1.27" y2="0" width="0.254" layer="94"/>
-<wire x1="1.27" y1="0" x2="0" y2="-1.27" width="0.254" layer="94"/>
-<wire x1="0" y1="-1.27" x2="-1.27" y2="0" width="0.254" layer="94"/>
-<text x="-2.413" y="-3.175" size="1.778" layer="96">&gt;VALUE</text>
-<pin name="GND2" x="0" y="2.54" visible="off" length="short" direction="sup" rot="R270"/>
-</symbol>
-</symbols>
-<devicesets>
-<deviceset name="GND2" prefix="SUPPLY">
-<description>&lt;b&gt;SUPPLY SYMBOL&lt;/b&gt;</description>
-<gates>
-<gate name="G$1" symbol="GND2" x="0" y="0"/>
-</gates>
-<devices>
-<device name="">
-<technologies>
-<technology name=""/>
-</technologies>
-</device>
-</devices>
-</deviceset>
-</devicesets>
-</library>
 </libraries>
 <attributes>
 </attributes>
@@ -3149,8 +3240,9 @@ In this library the device names are the same as the pin names of the symbols, t
 <part name="J1" library="con-jack" deviceset="JACK-PLUG" device="0"/>
 <part name="JP1" library="SparkFun-Connectors" deviceset="M02" device="LOCK"/>
 <part name="GND6" library="SparkFun-Aesthetics" deviceset="GND" device=""/>
-<part name="SUPPLY4" library="supply2" deviceset="GND2" device="" value="BATGND"/>
 <part name="U$3" library="robot" deviceset="BQ24072" device="VSON16"/>
+<part name="U$4" library="robot" deviceset="MIC5239SOT223" device="SOT223" value="MIC5239-3.3v"/>
+<part name="U$5" library="robot" deviceset="MIC5239-8" device="MSOP" value="MIC5239-3.3v"/>
 </parts>
 <sheets>
 <sheet>
@@ -3637,8 +3729,6 @@ In this library the device names are the same as the pin names of the symbols, t
 <wire x1="193.04" y1="7.62" x2="284.48" y2="7.62" width="0.1524" layer="94"/>
 <text x="195.58" y="17.78" size="1.778" layer="94">WISLEEP</text>
 <text x="195.58" y="10.16" size="1.778" layer="94">POWER</text>
-<text x="134.62" y="144.78" size="1.778" layer="97">BAT+</text>
-<text x="134.62" y="142.24" size="1.778" layer="97">BAT-</text>
 <text x="114.3" y="121.92" size="1.778" layer="97">With plug, 1 and 2 breaks</text>
 <text x="114.3" y="124.46" size="1.778" layer="97">No plug, 1 and 2 connects</text>
 </plain>
@@ -3646,10 +3736,11 @@ In this library the device names are the same as the pin names of the symbols, t
 <instance part="GND7" gate="1" x="71.12" y="149.86"/>
 <instance part="U$2" gate="G$1" x="71.12" y="170.18"/>
 <instance part="J1" gate="G$1" x="121.92" y="142.24"/>
-<instance part="JP1" gate="G$1" x="147.32" y="144.78" rot="R180"/>
+<instance part="JP1" gate="G$1" x="226.06" y="144.78" rot="R180"/>
 <instance part="GND6" gate="1" x="129.54" y="132.08"/>
-<instance part="SUPPLY4" gate="G$1" x="137.16" y="132.08"/>
 <instance part="U$3" gate="G$1" x="71.12" y="78.74"/>
+<instance part="U$4" gate="G$1" x="154.94" y="96.52"/>
+<instance part="U$5" gate="G$1" x="210.82" y="93.98"/>
 </instances>
 <busses>
 </busses>
@@ -3689,28 +3780,13 @@ In this library the device names are the same as the pin names of the symbols, t
 <pinref part="GND6" gate="1" pin="GND"/>
 </segment>
 </net>
-<net name="POW" class="0">
+<net name="POWDC" class="0">
 <segment>
 <pinref part="J1" gate="G$1" pin="3"/>
 <wire x1="127" y1="144.78" x2="129.54" y2="144.78" width="0.127" layer="91"/>
-<wire x1="129.54" y1="144.78" x2="139.7" y2="144.78" width="0.127" layer="91"/>
 <wire x1="129.54" y1="144.78" x2="129.54" y2="152.4" width="0.127" layer="91"/>
-<junction x="129.54" y="144.78"/>
 <label x="139.7" y="152.4" size="1.778" layer="95"/>
 <wire x1="129.54" y1="152.4" x2="139.7" y2="152.4" width="0.127" layer="91"/>
-</segment>
-</net>
-<net name="GND2" class="0">
-<segment>
-<pinref part="J1" gate="G$1" pin="2"/>
-<pinref part="JP1" gate="G$1" pin="2"/>
-<wire x1="127" y1="142.24" x2="132.08" y2="142.24" width="0.127" layer="91"/>
-<wire x1="132.08" y1="142.24" x2="139.7" y2="142.24" width="0.127" layer="91"/>
-<wire x1="132.08" y1="142.24" x2="132.08" y2="139.7" width="0.127" layer="91"/>
-<wire x1="132.08" y1="139.7" x2="137.16" y2="139.7" width="0.127" layer="91"/>
-<wire x1="137.16" y1="139.7" x2="137.16" y2="134.62" width="0.127" layer="91"/>
-<pinref part="SUPPLY4" gate="G$1" pin="GND2"/>
-<junction x="132.08" y="142.24"/>
 </segment>
 </net>
 </nets>
