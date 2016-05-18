@@ -1,23 +1,39 @@
 STM32F1
 =======
-PA0	GPIO	ACC_INT1	
-PA2	USART2_TX	DEBUG
-PA3	USART2_RX	DEBUG
-PA4	GPIO	SPI_CS
-PA5	SPI1	SPI_SCK
-PA6	SPI1	SPI_MISO
-PA7	SPI1	SPI_MOSI
-PA8	GPIO	5V_ENABLE	
-PA9	USART1_TX	WIFI_RX	
-PA10	USART2_RX	WIFI_TX
-PA13	SWDIO	DEBUG
-PA14	SWDCLK	DEBUG
-	
-PB10	I2C2_SCL	PERIPHERAL
-PB11	I2C2_SDA	PERIPHERAL
-PB15	SPI2_MOSI	LED WS2812B
+PA0	IN		ACC_INT1	accelerometer interrupt
+PA2	USART2_TX	DEBUG		debug cli tx
+PA3	USART2_RX	DEBUG		debug cli rx
+PA4	GPIO		WIFI_IO5	esp gpio [GPIO5]
+PA5	GPIO		WIFI_IO4	esp gpio [GPIO4]
+PA6
+PA7
+PA8	
+PA9	USART1_TX	WIFI_RX		esp uart
+PA10	USART2_RX	WIFI_TX		esp uart
+PA11	OUT		WIFI_POW_ENA	esp 3.3v enable
+PA12
+PA13	SWDIO		DEBUG		swd
+PA14	SWDCLK		DEBUG		swd
+PA15
 
-PC13	GPIO		LED
+PB0	OUT		WIFI_BOOT	esp boot select [GPIO0]
+PB1	OUT		WIFI_RES	esp reset [RES]
+PB2	OUT		WIFI_BL2	esp boot [GPIO2]
+PB3	OUT		5V_ENA		lamp 5v enable
+PB4
+PB5
+PB6	I2C1_SCL	PERIPHERAL	i2c bus clock
+PB7	I2C1_SDA	PERIPHERAL	i2c bus data
+PB8
+PB9
+PB10	IN		NCHG		bq24072 not charging
+PB11	IN		NPGOOD		bq24072 not power good
+PB12	OUT		WIFI_ENA	esp power down [CH_PD]
+PB13	OUT		WIFI_BL15	esp boot [GPIO15]
+PB14
+PB15	SPI2_MOSI	LED WS2812B	ws2812b single wire output
+
+PC13	OUT		LED		debug lamp
 
 
 
@@ -26,5 +42,31 @@ ESP8266
 GPIO0	0 = uart flash  /  1 = flash boot
 GPIO2	1 (bootloader)
 GPIO15	0 (bootloader)
-RES		1
+RES	1
 CHIP_EN	1
+
+
+bq24072
+=======
+BAT	2,3	4.7uF-47uF bypass ceramic
+CE	4	pull down 10k
+EN2	5	TODO 0 100mA  0 500mA  1 ILIM	=> 1
+EN1	6	TODO 0        1        0	=> 0
+ILIM	12	TODO 1100R-8kR to VSS
+		1.3A input current limit
+		RILIM=KILIM/IMAX => RILIM=1550AR/1.3A => 1192A
+IN	13	1uF-10uF bypass
+ISET	16	TODO 590R-8.9kR to VSS
+		fast charge should be around ~1C
+		800mA fast charge current (1C - 800mAh => 800mA)
+		RISET=KISET/ICHG => RISET=890AR/0.8A => 1113R
+OUT	10,11	4.7uF-47uF bypass ceramic
+TD	15	TODO
+		Enable, bind LOW
+TMR	14	TODO not to VSS, perhaps NC, otherwise 18kR-72kR to VSS
+		3 hour fast-charge safety timer
+		RTMR=TMAXCHG/(10*KTMR)
+		KTMR=48s/kR
+		RTMR=(3*60*60)/(10*48) => 22.5kR
+TS	1	TODO 10kR to VSS
+		no NTC thermistor => 10kR
