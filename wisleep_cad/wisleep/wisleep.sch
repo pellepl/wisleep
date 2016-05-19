@@ -4648,12 +4648,6 @@ Type: &lt;b&gt;SPC4077 / SPC 4078&lt;/b&gt;&lt;p&gt;</description>
 <junction x="30.48" y="86.36"/>
 </segment>
 </net>
-<net name="N$7" class="0">
-<segment>
-<pinref part="U$1" gate="G$1" pin="4"/>
-<wire x1="261.62" y1="190.5" x2="266.7" y2="190.5" width="0.127" layer="91"/>
-</segment>
-</net>
 <net name="LAMP_IO" class="0">
 <segment>
 <pinref part="IC1" gate="PORTB_H" pin="PB15"/>
@@ -4865,10 +4859,16 @@ Type: &lt;b&gt;SPC4077 / SPC 4078&lt;/b&gt;&lt;p&gt;</description>
 <wire x1="38.1" y1="193.04" x2="33.02" y2="193.04" width="0.127" layer="91"/>
 </segment>
 </net>
-<net name="N$18" class="0">
+<net name="DBG_IO" class="0">
 <segment>
 <pinref part="IC1" gate="PORTA_L" pin="PA6"/>
 <wire x1="38.1" y1="180.34" x2="33.02" y2="180.34" width="0.127" layer="91"/>
+<label x="20.32" y="180.34" size="1.778" layer="95"/>
+</segment>
+<segment>
+<pinref part="U$1" gate="G$1" pin="4"/>
+<wire x1="261.62" y1="190.5" x2="266.7" y2="190.5" width="0.127" layer="91"/>
+<label x="266.7" y="190.5" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="N$20" class="0">
