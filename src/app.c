@@ -19,6 +19,8 @@
 #include "lamp.h"
 #include <stdarg.h>
 
+#define SENSORS_DISABLE //TODO remove
+
 static volatile u8_t cpu_claims;
 static u8_t cli_buf[16];
 volatile bool cli_rd;
@@ -214,6 +216,12 @@ static void app_spin(void) {
   } // while forever
 }
 
+static u32_t _dbgio_flanks = 0;
+static void dbgio_irq(gpio_pin pin) {
+  print("PA6:%i\n", gpio_get(PORTA, PIN6) != 0 ? 1 : 0);
+  _dbgio_flanks++;
+}
+
 void APP_init(void) {
   WDOG_start(APP_WDOG_TIMEOUT_S);
 
@@ -237,7 +245,31 @@ void APP_init(void) {
   if (RCC_GetFlagStatus(RCC_FLAG_WWDGRST) == SET) print("WWDG\n");
   RCC_ClearFlag();
 
+  // detach PB3 (PIN_POW_5V) from JTAG (see https://my.st.com/public/STe2ecommunities/mcu/Lists/cortex_mx_stm32/Flat.aspx?RootFolder=https%3a%2f%2fmy%2est%2ecom%2fpublic%2fSTe2ecommunities%2fmcu%2fLists%2fcortex_mx_stm32%2fSTM32%20F103xx%20using%20PB3&FolderCTID=0x01200200770978C69A1141439FE559EB459D7580009C4E14902C3CDE46A77F0FFD06506F5B&currentviews=3071)
+  GPIO_PinRemapConfig(GPIO_Remap_SWJ_NoJTRST, ENABLE);
+  GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE);
 
+  gpio_config(PIN_POW_WIFI, CLK_2MHZ, OUT, AF0, PUSHPULL, NOPULL);
+  gpio_disable(PIN_POW_WIFI);
+  gpio_config(PIN_POW_5V, CLK_2MHZ, OUT, AF0, PUSHPULL, NOPULL);
+  gpio_disable(PIN_POW_5V);
+
+  gpio_config(PIN_POW_NCHG, CLK_2MHZ, IN, AF0, OPENDRAIN, NOPULL);
+  gpio_config(PIN_POW_NPGOOD, CLK_2MHZ, IN, AF0, OPENDRAIN, NOPULL);
+
+  gpio_config(PIN_WIFI_ENA, CLK_2MHZ, OUT, AF0, PUSHPULL, NOPULL);
+  gpio_config(PIN_WIFI_BOOT, CLK_2MHZ, OUT, AF0, PUSHPULL, NOPULL);
+  gpio_config(PIN_WIFI_RESET, CLK_2MHZ, OUT, AF0, PUSHPULL, NOPULL);
+  gpio_config(PIN_WIFI_BL2, CLK_2MHZ, OUT, AF0, PUSHPULL, NOPULL);
+  gpio_config(PIN_WIFI_BL15, CLK_2MHZ, OUT, AF0, PUSHPULL, NOPULL);
+  gpio_config(PIN_WIFI_IO5, CLK_2MHZ, OUT, AF0, PUSHPULL, NOPULL);
+  gpio_config(PIN_WIFI_IO4, CLK_2MHZ, OUT, AF0, PUSHPULL, NOPULL);
+
+  gpio_config(PIN_DEBUG_IO, CLK_10MHZ, IN, AF0, PUSHPULL, PULLUP);
+  gpio_interrupt_config(PIN_DEBUG_IO, dbgio_irq, FLANK_BOTH);
+  gpio_interrupt_mask_enable(PIN_DEBUG_IO, TRUE);
+
+  gpio_config(PIN_LED, CLK_2MHZ, OUT, AF0, PUSHPULL, NOPULL);
   gpio_enable(PIN_LED);
 
   cpu_claims = 0;
@@ -245,8 +277,10 @@ void APP_init(void) {
   task *heatbeat_task = TASK_create(heartbeat, TASK_STATIC);
   TASK_start_timer(heatbeat_task, &heartbeat_timer, 0, 0, 0, APP_HEARTBEAT_MS, "heartbeat");
 
+#ifndef SENSORS_DISABLE
   temp_task = TASK_create(read_temp, TASK_STATIC);
   TASK_start_timer(temp_task, &temp_timer, 0, 0, 1000, APP_TEMPERATURE_MS, "temp");
+#endif
 
 #ifdef DETECT_UART
   cli_tmo_task = TASK_create(cli_tmo, TASK_STATIC);
@@ -260,8 +294,10 @@ void APP_init(void) {
   cli_rd = FALSE;
   IO_set_callback(IOSTD, cli_rx_avail_irq, NULL);
 
+#ifndef SENSORS_DISABLE
   SENS_init();
   SENS_enter_active();
+#endif
 
   LAMP_init();
 
@@ -343,8 +379,31 @@ void APP_report_data(
   }
 }
 
+#ifndef SENSORS_DISABLE
 static s32_t cli_temp(u32_t argc) {
   SENS_read_temp();
+  return CLI_OK;
+}
+#endif
+
+
+static s32_t cli_pow3(u32_t argc, u32_t ena) {
+  if (argc == 0) ena = 0;
+  if (ena) {
+    gpio_enable(PIN_POW_WIFI);
+  } else {
+    gpio_disable(PIN_POW_WIFI);
+  }
+  return CLI_OK;
+}
+
+static s32_t cli_pow5(u32_t argc, u32_t ena) {
+  if (argc == 0) ena = 0;
+  if (ena) {
+    gpio_enable(PIN_POW_5V);
+  } else {
+    gpio_disable(PIN_POW_5V);
+  }
   return CLI_OK;
 }
 
@@ -376,6 +435,9 @@ static s32_t cli_info(u32_t argc) {
       "RTCCNT:%016llx\n"
       "RTCALR:%016llx\n",
       RTC_get_tick(), RTC_get_alarm_tick());
+  print(
+      "DBGIO :%i (%i flanks)\n", gpio_get(PIN_DEBUG_IO), _dbgio_flanks
+      );
   return CLI_OK;
 }
 
@@ -386,7 +448,11 @@ CLI_EXTERN_MENU(wifi)
 CLI_MENU_START_MAIN
 CLI_EXTRAMENU(common)
 CLI_SUBMENU(wifi, "wifi", "SUBMENU: wifi module")
+#ifndef SENSORS_DISABLE
 CLI_FUNC("temp", cli_temp, "Reads temperature")
+#endif
+CLI_FUNC("pow3", cli_pow3, "Enable/disable 3V3 regulator")
+CLI_FUNC("pow5", cli_pow5, "Enable/disable 5V0 regulator")
 CLI_FUNC("info", cli_info, "Prints system info")
 CLI_FUNC("help", cli_help, "Prints help")
 CLI_MENU_END

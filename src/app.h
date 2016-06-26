@@ -10,12 +10,40 @@
 
 #include "system.h"
 
-#define WIFIDO_VERSION        0x00010000
+#define WIFIDO_VERSION        0x00010100
 
+#define PIN_ACC_INT           PORTA, PIN0
 #define PIN_UART_TX           PORTA, PIN2
 #define PIN_UART_RX           PORTA, PIN3
+
+#define PIN_WIFI_IO5          PORTA, PIN4
+#define PIN_WIFI_IO4          PORTA, PIN5
+
+#define PIN_DEBUG_IO          PORTA, PIN6
+
+#define PIN_WIFI_UART_TX      PORTA, PIN9
+#define PIN_WIFI_UART_RX      PORTA, PIN10
+
+#define PIN_POW_WIFI          PORTA, PIN11
+
+#define PIN_WIFI_BOOT         PORTB, PIN0
+#define PIN_WIFI_RESET        PORTB, PIN1
+#define PIN_WIFI_BL2          PORTB, PIN2
+
+#define PIN_POW_5V            PORTB, PIN3
+
+#define PIN_I2C1_SCL          PORTB, PIN6
+#define PIN_I2C1_SDA          PORTB, PIN7
+
+#define PIN_POW_NCHG          PORTB, PIN10
+#define PIN_POW_NPGOOD        PORTB, PIN11
+
+#define PIN_WIFI_ENA          PORTB, PIN12
+#define PIN_WIFI_BL15         PORTB, PIN13
+
+#define PIN_LAMP_CTRL         PORTB, PIN15
+
 #define PIN_LED               PORTC, PIN13
-#define PIN_ACC_INT           PORTA, PIN0
 
 #define APP_PREVENT_SLEEP_IF_LESS_MS    20
 #define APP_WDOG_TIMEOUT_S              23

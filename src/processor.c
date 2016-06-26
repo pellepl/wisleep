@@ -97,10 +97,10 @@ static void NVIC_config(void)
 #endif
 
 #ifdef CONFIG_I2C
-  NVIC_SetPriority(I2C2_EV_IRQn, NVIC_EncodePriority(prioGrp, 7, 1));
-  NVIC_EnableIRQ(I2C2_EV_IRQn);
-  NVIC_SetPriority(I2C2_ER_IRQn, NVIC_EncodePriority(prioGrp, 7, 1));
-  NVIC_EnableIRQ(I2C2_ER_IRQn);
+  NVIC_SetPriority(I2C1_EV_IRQn, NVIC_EncodePriority(prioGrp, 7, 1));
+  NVIC_EnableIRQ(I2C1_EV_IRQn);
+  NVIC_SetPriority(I2C1_ER_IRQn, NVIC_EncodePriority(prioGrp, 7, 1));
+  NVIC_EnableIRQ(I2C1_ER_IRQn);
 #endif
 
 #ifdef CONFIG_RTC
@@ -111,18 +111,28 @@ static void NVIC_config(void)
   // WS2812B driver
   NVIC_SetPriority(DMA1_Channel5_IRQn, NVIC_EncodePriority(prioGrp, 5, 0));
   NVIC_EnableIRQ(DMA1_Channel5_IRQn);
+
+  // extis
+  NVIC_SetPriority(EXTI0_IRQn, NVIC_EncodePriority(prioGrp, 7, 0));
+  NVIC_SetPriority(EXTI1_IRQn, NVIC_EncodePriority(prioGrp, 7, 0));
+  NVIC_SetPriority(EXTI2_IRQn, NVIC_EncodePriority(prioGrp, 7, 0));
+  NVIC_SetPriority(EXTI3_IRQn, NVIC_EncodePriority(prioGrp, 7, 0));
+  NVIC_SetPriority(EXTI4_IRQn, NVIC_EncodePriority(prioGrp, 7, 0));
+  NVIC_SetPriority(EXTI9_5_IRQn, NVIC_EncodePriority(prioGrp, 7, 0));
+  NVIC_SetPriority(EXTI15_10_IRQn, NVIC_EncodePriority(prioGrp, 7, 0));
+
 }
 
 static void UART1_config() {
 #ifdef CONFIG_UART1
-  gpio_config(PORTA, PIN9, CLK_50MHZ, AF, AF0, PUSHPULL, NOPULL);
-  gpio_config(PORTA, PIN10, CLK_50MHZ, IN, AF0, OPENDRAIN, NOPULL);
+  gpio_config(PIN_WIFI_UART_TX, CLK_50MHZ, AF, AF0, PUSHPULL, NOPULL);
+  gpio_config(PIN_WIFI_UART_RX, CLK_50MHZ, IN, AF0, OPENDRAIN, NOPULL);
 #endif
 }
 static void UART2_config() {
 #ifdef CONFIG_UART2
-  gpio_config(PORTA, PIN2, CLK_50MHZ, AF, AF0, PUSHPULL, NOPULL);
-  gpio_config(PORTA, PIN3, CLK_50MHZ, IN, AF0, OPENDRAIN, NOPULL);
+  gpio_config(PIN_UART_TX, CLK_50MHZ, AF, AF0, PUSHPULL, NOPULL);
+  gpio_config(PIN_UART_RX, CLK_50MHZ, IN, AF0, OPENDRAIN, NOPULL);
 #endif
 }
 
@@ -151,8 +161,8 @@ static void TIM_config(void) {
 
 static void I2C_config(void) {
 #ifdef CONFIG_I2C
-  gpio_config(PORTB, PIN10, CLK_50MHZ, AF, AF0, OPENDRAIN, NOPULL);
-  gpio_config(PORTB, PIN11, CLK_50MHZ, AF, AF0, OPENDRAIN, NOPULL);
+  gpio_config(PIN_I2C1_SCL, CLK_50MHZ, AF, AF0, OPENDRAIN, NOPULL);
+  gpio_config(PIN_I2C1_SDA, CLK_50MHZ, AF, AF0, OPENDRAIN, NOPULL);
 #endif
 }
 
@@ -290,7 +300,7 @@ void PROC_periph_init() {
   DBGMCU_Config(DBGMCU_STOP | DBGMCU_SLEEP, ENABLE);
 
   // led
-  gpio_config(PORTC, PIN13, CLK_50MHZ, OUT, AF0, PUSHPULL, NOPULL);
+  gpio_config(PIN_LED, CLK_50MHZ, OUT, AF0, PUSHPULL, NOPULL);
 
   SPI_config();
   I2C_config();

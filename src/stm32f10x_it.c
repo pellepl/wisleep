@@ -173,18 +173,18 @@ void DMA1_Channel4_IRQHandler() {
 #endif
 
 #ifdef CONFIG_I2C
-void I2C2_ER_IRQHandler(void)
+void I2C1_ER_IRQHandler(void)
 {
-  TRACE_IRQ_ENTER(I2C2_ER_IRQn);
+  TRACE_IRQ_ENTER(I2C1_ER_IRQn);
   I2C_IRQ_err(&__i2c_bus_vec[0]);
-  TRACE_IRQ_EXIT(I2C2_ER_IRQn);
+  TRACE_IRQ_EXIT(I2C1_ER_IRQn);
 }
 
-void I2C2_EV_IRQHandler(void)
+void I2C1_EV_IRQHandler(void)
 {
-  TRACE_IRQ_ENTER(I2C2_EV_IRQn);
+  TRACE_IRQ_ENTER(I2C1_EV_IRQn);
   I2C_IRQ_ev(&__i2c_bus_vec[0]);
-  TRACE_IRQ_EXIT(I2C2_EV_IRQn);
+  TRACE_IRQ_EXIT(I2C1_EV_IRQn);
 }
 #endif
 

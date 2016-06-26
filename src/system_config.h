@@ -127,8 +127,8 @@
 
 #ifdef CONFIG_I2C
 
-#define I2C1_CLK                      RCC_APB1Periph_I2C2
-#define I2C1_PORT                     I2C2
+#define I2C1_CLK                      RCC_APB1Periph_I2C1
+#define I2C1_PORT                     I2C1
 
 #define I2C_MAX_ID                    1
 
