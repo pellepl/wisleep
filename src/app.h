@@ -45,6 +45,8 @@
 
 #define PIN_LED               PORTC, PIN13
 
+#define ESP_FLASH_PROGRAMMING_BAUD_RATE 115200
+
 #define APP_PREVENT_SLEEP_IF_LESS_MS    20
 #define APP_WDOG_TIMEOUT_S              23
 #define APP_HEARTBEAT_MS                20000

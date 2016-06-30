@@ -113,6 +113,7 @@ CFILES 		+= timer.c
 
 CFILES		+= app.c sensor.c lamp.c
 CFILES		+= ws2812b_spi_stm32f1.c bridge_stm.c
+CFILES		+= esp.c
 
 umacdir		= ${sourcedir}/umac
 CPATH		+= ${umacdir}

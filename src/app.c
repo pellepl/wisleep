@@ -18,6 +18,7 @@
 #include "sensor.h"
 #include "lamp.h"
 #include <stdarg.h>
+#include "esp.h"
 
 #define SENSORS_DISABLE //TODO remove
 
@@ -218,8 +219,12 @@ static void app_spin(void) {
 
 static u32_t _dbgio_flanks = 0;
 static void dbgio_irq(gpio_pin pin) {
-  print("PA6:%i\n", gpio_get(PORTA, PIN6) != 0 ? 1 : 0);
+  //print("PA6:%i\n", gpio_get(PIN_DEBUG_IO) != 0 ? 1 : 0);
   _dbgio_flanks++;
+  if (gpio_get(PIN_DEBUG_IO) == 0) {
+    task *t = TASK_create(esp_flash_start, 0);
+    TASK_run(t, 0, NULL);
+  }
 }
 
 void APP_init(void) {
@@ -256,14 +261,6 @@ void APP_init(void) {
 
   gpio_config(PIN_POW_NCHG, CLK_2MHZ, IN, AF0, OPENDRAIN, NOPULL);
   gpio_config(PIN_POW_NPGOOD, CLK_2MHZ, IN, AF0, OPENDRAIN, NOPULL);
-
-  gpio_config(PIN_WIFI_ENA, CLK_2MHZ, OUT, AF0, PUSHPULL, NOPULL);
-  gpio_config(PIN_WIFI_BOOT, CLK_2MHZ, OUT, AF0, PUSHPULL, NOPULL);
-  gpio_config(PIN_WIFI_RESET, CLK_2MHZ, OUT, AF0, PUSHPULL, NOPULL);
-  gpio_config(PIN_WIFI_BL2, CLK_2MHZ, OUT, AF0, PUSHPULL, NOPULL);
-  gpio_config(PIN_WIFI_BL15, CLK_2MHZ, OUT, AF0, PUSHPULL, NOPULL);
-  gpio_config(PIN_WIFI_IO5, CLK_2MHZ, OUT, AF0, PUSHPULL, NOPULL);
-  gpio_config(PIN_WIFI_IO4, CLK_2MHZ, OUT, AF0, PUSHPULL, NOPULL);
 
   gpio_config(PIN_DEBUG_IO, CLK_10MHZ, IN, AF0, PUSHPULL, PULLUP);
   gpio_interrupt_config(PIN_DEBUG_IO, dbgio_irq, FLANK_BOTH);
@@ -407,6 +404,17 @@ static s32_t cli_pow5(u32_t argc, u32_t ena) {
   return CLI_OK;
 }
 
+static s32_t cli_esp_flash(u32_t argc, u32_t ena) {
+  task *t = TASK_create(esp_flash_start, 0);
+  TASK_run(t, 0, NULL);
+  return CLI_OK;
+}
+
+static s32_t cli_esp_boot(u32_t argc, u32_t ena) {
+  esp_powerup(FALSE);
+  return CLI_OK;
+}
+
 static s32_t cli_info(u32_t argc) {
   RCC_ClocksTypeDef clocks;
   print("DEV:%08x REV:%08x\n", DBGMCU_GetDEVID(), DBGMCU_GetREVID());
@@ -453,6 +461,8 @@ CLI_FUNC("temp", cli_temp, "Reads temperature")
 #endif
 CLI_FUNC("pow3", cli_pow3, "Enable/disable 3V3 regulator")
 CLI_FUNC("pow5", cli_pow5, "Enable/disable 5V0 regulator")
+CLI_FUNC("esp-flash", cli_esp_flash, "Fake an ESP flash programming signal")
+CLI_FUNC("esp-boot", cli_esp_boot, "Boot up ESP8266")
 CLI_FUNC("info", cli_info, "Prints system info")
 CLI_FUNC("help", cli_help, "Prints help")
 CLI_MENU_END
