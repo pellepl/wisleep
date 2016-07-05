@@ -15,6 +15,7 @@
 #define SYSTASK_CLAIM_FLAG (1<<31)
 
 static xQueueHandle sysq;
+static bool apscan_dbg = false;
 
 static struct sdk_scan_config scan_cfg;
 static void sdk_scan_done_cb(void *arg, sdk_scan_status_t status) {
@@ -24,10 +25,19 @@ static void sdk_scan_done_cb(void *arg, sdk_scan_status_t status) {
     struct sdk_bss_info *bss_link = (struct sdk_bss_info *) arg;
     bss_link = (struct sdk_bss_info *) bss_link->next.stqe_next; //ignore first
     while (fd >= 0 && bss_link != NULL) {
+      if (apscan_dbg) {
+        printf("ch:%2i  bssid:%02x.%02x.%02x.%02x.%02x.%02x  ssid:%s  rssi:%i\n",
+            bss_link->channel, bss_link->bssid[5], bss_link->bssid[4],bss_link->bssid[3],bss_link->bssid[2],
+            bss_link->bssid[1],bss_link->bssid[0], bss_link->ssid, bss_link->rssi);
+      }
       fs_write(fd, bss_link, sizeof(struct sdk_bss_info));
       bss_link = (struct sdk_bss_info *) bss_link->next.stqe_next;
     }
     fs_close(fd);
+    if (apscan_dbg) {
+      printf("scan finished\n");
+      apscan_dbg = false;
+    }
     server_release_busy();
   }
 }
@@ -52,12 +62,20 @@ static void systask_task(void *pvParameters) {
       case SYS_FS_CHECK:
         fs_check();
         break;
+      case SYS_WIFI_SCAN_DBG:
+        apscan_dbg = true;
+        printf("scanning aps\n");
+        // no break
       case SYS_WIFI_SCAN:
         server_claim_busy();
         server_set_busy_status("Scanning", -1);
         fs_remove(SYSTASK_AP_SCAN_FILENAME);
         bool res = sdk_wifi_station_scan(&scan_cfg, sdk_scan_done_cb);
         if (!res) {
+          if (apscan_dbg) {
+            printf("Failed scanning aps\n");
+          }
+          apscan_dbg = false;
           server_release_busy();
         }
         break;

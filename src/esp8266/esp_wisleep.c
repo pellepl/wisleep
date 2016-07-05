@@ -165,10 +165,15 @@ void user_init(void) {
             setup_ap = false;
           }
         }
-
+        printf("ssid:%s\n", config.ssid);
       } // if read
+      else {
+        printf("could not read .ssid\n");
+      }
     } // if fs_ssid
-
+    else {
+      printf("no .ssid found, running softAP\n");
+    }
     // find device id or create one
     spiffs_file fd_devid = fs_open(".devid", SPIFFS_RDONLY, 0);
     if (fd_devid < 0) {

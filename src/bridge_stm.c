@@ -281,9 +281,29 @@ static s32_t cli_hello(u32_t argc) {
   return CLI_OK;
 }
 
+static s32_t cli_apscan(u32_t argc) {
+  tx_buf[0] = P_ESP_AP_SCAN;
+  umac_tx_pkt(&um, TRUE, tx_buf, 1);
+  return CLI_OK;
+}
+
+static s32_t cli_apcfg(u32_t argc, char *ssid, char *pass) {
+  tx_buf[0] = P_ESP_AP_CFG;
+  u32_t ssid_len = strlen(ssid);
+  u32_t pass_len = strlen(pass);
+  tx_buf[1] = ssid_len;
+  memcpy(&tx_buf[2], ssid, ssid_len);
+  tx_buf[2 + ssid_len] = pass_len;
+  memcpy(&tx_buf[2 + ssid_len + 1], pass, pass_len);
+  umac_tx_pkt(&um, TRUE, tx_buf, 2 + ssid_len + 1 + pass_len);
+  return CLI_OK;
+}
+
 CLI_MENU_START(wifi)
 CLI_FUNC("ping", cli_hello, "Pings ESP8266")
 CLI_FUNC("udp_tx", cli_udp_tx, "Test send an UDP broadcast to port 12345")
 CLI_FUNC("udp_rx", cli_udp_rx, "Test receive an UDP broadcast to port 12345")
+CLI_FUNC("apscan", cli_apscan, "Request an AP scan")
+CLI_FUNC("apcfg", cli_apcfg, "Set AP, <ssid> <passw>")
 CLI_MENU_END
 

@@ -20,7 +20,7 @@
 #include <stdarg.h>
 #include "esp.h"
 
-#define SENSORS_DISABLE //TODO remove
+//#define SENSORS_DISABLE //TODO remove
 
 static volatile u8_t cpu_claims;
 static u8_t cli_buf[16];

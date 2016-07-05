@@ -21,7 +21,6 @@ typedef enum {
   P_STM_LAMP_GET_STATUS,    // ACK:[on/off][intensity][red][green][blue]
   P_STM_CURRENT_TIME,       //
   P_STM_RECV_UDP,           // [addr:3][addr:2][addr:1][addr:0]<payload>
-
 } proto_stm;
 
 // packet ids to esp from stm
@@ -31,6 +30,8 @@ typedef enum {
   P_ESP_RECV_UDP,           // [addr:3][addr:2][addr:1][addr:0][port_h][port_l][tmo_h][tmo_l]
   P_ESP_SEND_RECV_UDP,      // [addr:3][addr:2][addr:1][addr:0][port_h][port_l][tmo_h][tmo_l]<payload>
   P_ESP_REQUEST_TIME,       //
+  P_ESP_AP_SCAN,            //
+  P_ESP_AP_CFG,             // [len_ssid_str]<ssid_str>[len_passw_str]<passw_str>
 
 
 } proto_efm;

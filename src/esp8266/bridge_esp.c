@@ -20,6 +20,7 @@
 #include "udputil.h"
 #include "systasks.h"
 #include "../protocol.h"
+#include "fs.h"
 #include <esp/hwrand.h>
 
 static xQueueHandle syncq;
@@ -159,6 +160,10 @@ void bridge_rx_pkt(umac_pkt *pkt, bool resent) {
   case P_ESP_HELLO:
     bridge_tx_reply(data, pkt->length);
   break;
+  case P_ESP_AP_SCAN:
+    if (resent) break;
+    systask_call(SYS_WIFI_SCAN_DBG, false);
+  break;
   case P_ESP_SEND_UDP:
     if (resent) break;
     udputil_config(
@@ -197,6 +202,28 @@ void bridge_rx_pkt(umac_pkt *pkt, bool resent) {
         bridge_udp_recv_cb                                            // recv_cb
       );
     systask_call(SYS_UDP_SEND_RECV, false);
+    break;
+  case P_ESP_AP_CFG:
+    if (resent) break;
+    uint32_t ssid_len = data[1];
+    uint32_t pass_len = data[1 + ssid_len + 1];
+    uint8_t *ssid = &data[2];
+    uint8_t *pass = &data[1 + ssid_len + 1 + 1];
+    {
+      uint8_t nl = '\n';
+      fs_clearerr();
+      spiffs_file fd = fs_open(".ssid", SPIFFS_O_CREAT | SPIFFS_O_TRUNC | SPIFFS_O_WRONLY, 0);
+      if (fd >= 0) {
+        fs_write(fd, ssid, ssid_len);
+        fs_write(fd, &nl, 1);
+        fs_write(fd, pass, pass_len);
+        fs_write(fd, &nl, 1);
+        fs_close(fd);
+      } else {
+        printf("could not create credential file\n");
+      }
+      printf("fs res: %i\n", fs_errno());
+    }
   break;
 
 
